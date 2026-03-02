@@ -67,9 +67,9 @@ fn deserialize(subtopic: &Subtopic, payload: &[u8]) -> Result<InboundMessage> {
         // Server → ESP32 topics are outbound-only, we don't deserialize them here.
         Subtopic::BallHit | Subtopic::GameState | Subtopic::Cmd => {
             warn!(subtopic = ?subtopic, "received message on outbound-only topic, ignoring");
-            Err(BridgeError::Topic(TopicError::UnknownSubtopic(
-                format!("{subtopic:?} is outbound-only"),
-            )))
+            Err(BridgeError::Topic(TopicError::UnknownSubtopic(format!(
+                "{subtopic:?} is outbound-only"
+            ))))
         }
     }
 }
@@ -146,7 +146,8 @@ mod tests {
     #[test]
     fn handle_device_event() {
         let topic = "pinball/esp01/events";
-        let payload = br#"{"event":"boot","fw_version":"1.2.0","reason":"power_on","ts":1719312000000}"#;
+        let payload =
+            br#"{"event":"boot","fw_version":"1.2.0","reason":"power_on","ts":1719312000000}"#;
 
         let handled = handle_publish(topic, payload).unwrap();
 
