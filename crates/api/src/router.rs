@@ -1,9 +1,9 @@
-use axum::routing::get;
 use axum::Router;
+use axum::routing::get;
 use utoipa::OpenApi;
 use utoipa_scalar::{Scalar, Servable};
 
-use crate::docs::docs::ApiDoc;
+use crate::docs::ApiDoc;
 use crate::modules::health;
 use crate::modules::realtime::ws_handler;
 use crate::state::AppState;

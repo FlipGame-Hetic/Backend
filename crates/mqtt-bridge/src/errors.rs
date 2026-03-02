@@ -6,19 +6,31 @@ pub enum BridgeError {
     Client(#[from] rumqttc::ClientError),
 
     #[error("MQTT connection error: {0}")]
-    Connection(#[from] rumqttc::ConnectionError),
+    Connection(Box<rumqttc::ConnectionError>),
 
-    #[error("Json serialization error: {0}")]
+    #[error("JSON serialization error: {0}")]
     Serialization(#[from] serde_json::Error),
 
-    #[error("Invalid topic: {0}")]
+    #[error("invalid topic: {0}")]
     Topic(#[from] shared::dto::TopicError),
 
-    #[error("Websocket error: {0}")]
-    WebSocket(#[from] tokio_tungstenite::tungstenite::Error),
+    #[error("WebSocket error: {0}")]
+    WebSocket(Box<tokio_tungstenite::tungstenite::Error>),
 
-    #[error("Missing environment variable: {0}")]
+    #[error("missing environment variable: {0}")]
     Config(String),
+}
+
+impl From<rumqttc::ConnectionError> for BridgeError {
+    fn from(err: rumqttc::ConnectionError) -> Self {
+        Self::Connection(Box::new(err))
+    }
+}
+
+impl From<tokio_tungstenite::tungstenite::Error> for BridgeError {
+    fn from(err: tokio_tungstenite::tungstenite::Error) -> Self {
+        Self::WebSocket(Box::new(err))
+    }
 }
 
 pub type Result<T> = std::result::Result<T, BridgeError>;

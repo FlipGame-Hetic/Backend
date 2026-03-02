@@ -10,10 +10,7 @@ use tracing::{debug, error, info, warn};
 use crate::state::AppState;
 
 /// Axum handler: upgrade HTTP to WebSocket for a bridge connection.
-pub async fn ws_bridge(
-    ws: WebSocketUpgrade,
-    State(state): State<AppState>,
-) -> impl IntoResponse {
+pub async fn ws_bridge(ws: WebSocketUpgrade, State(state): State<AppState>) -> impl IntoResponse {
     info!("bridge websocket upgrade requested");
     ws.on_upgrade(|socket| handle_bridge(socket, state))
 }
@@ -53,10 +50,7 @@ async fn handle_bridge(socket: WebSocket, state: AppState) {
 }
 
 /// Read frames from the bridge, deserialize as `WsMessage`, and process.
-async fn read_loop(
-    mut stream: futures_util::stream::SplitStream<WebSocket>,
-    _state: AppState,
-) {
+async fn read_loop(mut stream: futures_util::stream::SplitStream<WebSocket>, _state: AppState) {
     while let Some(frame) = stream.next().await {
         let msg = match frame {
             Ok(m) => m,

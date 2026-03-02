@@ -1,7 +1,7 @@
+use axum::Router;
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use axum::routing::get;
-use axum::Router;
 use serde::Serialize;
 use utoipa::ToSchema;
 

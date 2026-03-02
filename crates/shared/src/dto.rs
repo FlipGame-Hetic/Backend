@@ -144,7 +144,8 @@ mod tests {
         ];
 
         for (raw, expected_subtopic) in cases {
-            let topic = Topic::parse(raw).unwrap_or_else(|e| panic!("failed to parse '{raw}': {e}"));
+            let topic =
+                Topic::parse(raw).unwrap_or_else(|e| panic!("failed to parse '{raw}': {e}"));
             assert_eq!(topic.device_id, "esp01");
             assert_eq!(topic.subtopic, expected_subtopic);
         }

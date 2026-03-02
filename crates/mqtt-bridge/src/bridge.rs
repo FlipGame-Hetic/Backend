@@ -68,14 +68,11 @@ impl Bridge {
         let (ws_tx, ws_rx) = mpsc::channel::<WsMessage>(INTERNAL_CHANNEL_SIZE);
 
         // Spawn all three tasks, abort on first failure
-        let mqtt_handle =
-            tokio::spawn(mqtt_inbound_loop(mqtt_event_loop, ws_tx));
+        let mqtt_handle = tokio::spawn(mqtt_inbound_loop(mqtt_event_loop, ws_tx));
 
-        let ws_write_handle =
-            tokio::spawn(ws_write_loop(ws_rx, ws_sink));
+        let ws_write_handle = tokio::spawn(ws_write_loop(ws_rx, ws_sink));
 
-        let ws_read_handle =
-            tokio::spawn(ws_outbound_loop(ws_source, mqtt_client));
+        let ws_read_handle = tokio::spawn(ws_outbound_loop(ws_source, mqtt_client));
 
         tokio::select! {
             res = mqtt_handle => {
@@ -164,10 +161,7 @@ async fn mqtt_inbound_loop(
 
 // Task 2: Channel => WebSocket sink
 
-async fn ws_write_loop<S>(
-    mut rx: mpsc::Receiver<WsMessage>,
-    mut sink: S,
-) -> Result<()>
+async fn ws_write_loop<S>(mut rx: mpsc::Receiver<WsMessage>, mut sink: S) -> Result<()>
 where
     S: SinkExt<WsRawMessage, Error = tokio_tungstenite::tungstenite::Error> + Unpin,
 {
@@ -187,10 +181,7 @@ where
 
 // Task 3: WebSocket source => MQTT publish
 
-async fn ws_outbound_loop<S>(
-    mut source: S,
-    mqtt_client: AsyncClient,
-) -> Result<()>
+async fn ws_outbound_loop<S>(mut source: S, mqtt_client: AsyncClient) -> Result<()>
 where
     S: StreamExt<Item = std::result::Result<WsRawMessage, tokio_tungstenite::tungstenite::Error>>
         + Unpin,
