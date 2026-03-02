@@ -4,7 +4,7 @@ members = [
     "crates/mqtt-bridge",
     "crates/shared",
 ]
-resolver = "2"
+resolver = "3"
 
 [workspace.dependencies]
 axum = { version = "0.8.8", features = ["ws"] }
