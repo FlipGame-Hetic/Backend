@@ -1,0 +1,10 @@
+.github/
+.git/
+target/
+*.md
+.env
+nginx/
+contracts/
+docker-compose.yml
+mosquitto.conf
+Dockerfile

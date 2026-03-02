@@ -1,0 +1,21 @@
+[package]
+name = "api"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+axum = { workspace = true, features = ["ws"] }
+tokio.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+thiserror.workspace = true
+utoipa.workspace = true
+utoipa-scalar.workspace = true
+tower-http = { version = "0.6", features = ["cors", "trace"] }
+futures-util.workspace = true
+shared = { path = "../shared" }
+
+[dev-dependencies]
+tower = { version = "0.5", features = ["util"] }
