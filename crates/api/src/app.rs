@@ -18,7 +18,7 @@ pub fn build(config: &ApiConfig) -> Router {
         .allow_methods(Any)
         .allow_headers(Any);
 
-    let state = AppState::new();
+    let state = AppState::new(config.jwt_secret.as_bytes().to_vec());
 
     router::build()
         .layer(TraceLayer::new_for_http())

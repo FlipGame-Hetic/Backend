@@ -4,6 +4,7 @@ use tracing_subscriber::{EnvFilter, fmt};
 mod app;
 mod config;
 mod docs;
+mod errors;
 mod modules;
 mod router;
 mod state;

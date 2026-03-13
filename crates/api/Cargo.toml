@@ -15,7 +15,12 @@ utoipa.workspace = true
 utoipa-scalar.workspace = true
 tower-http = { version = "0.6", features = ["cors", "trace"] }
 futures-util.workspace = true
+jsonwebtoken = "9"
 shared = { path = "../shared" }
+screen-hub = { path = "../screen-hub" }
 
 [dev-dependencies]
 tower = { version = "0.5", features = ["util"] }
+tokio-tungstenite.workspace = true
+futures-util.workspace = true
+reqwest = { version = "0.12", features = ["json"] }

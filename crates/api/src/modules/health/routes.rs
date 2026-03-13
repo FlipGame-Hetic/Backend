@@ -39,7 +39,7 @@ mod tests {
 
     #[tokio::test]
     async fn health_returns_ok() {
-        let app = router().with_state(AppState::new());
+        let app = router().with_state(AppState::new(b"flipper-dev-secret-change-in-prod".to_vec()));
 
         let response = app
             .oneshot(Request::get("/health").body(Body::empty()).unwrap())

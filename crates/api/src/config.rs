@@ -12,6 +12,7 @@ pub enum ConfigError {
 pub struct ApiConfig {
     pub port: u16,
     pub allowed_origins: Vec<String>,
+    pub jwt_secret: String,
 }
 
 impl ApiConfig {
@@ -28,9 +29,19 @@ impl ApiConfig {
             .filter(|s| !s.is_empty())
             .collect();
 
+        let jwt_secret = std::env::var("SCREEN_JWT_SECRET")
+            .unwrap_or_else(|_| "flipper-dev-secret-change-in-prod".to_owned());
+
+        if jwt_secret.len() < 32 {
+            return Err(ConfigError::Invalid(
+                "SCREEN_JWT_SECRET must be at least 32 characters".to_owned(),
+            ));
+        }
+
         Ok(Self {
             port,
             allowed_origins,
+            jwt_secret,
         })
     }
 
