@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use shared::screen::{ScreenEnvelope, ScreenId};
-use tokio::sync::{mpsc, RwLock};
+use tokio::sync::{RwLock, mpsc};
 use tracing::{debug, info, warn};
 
 use crate::error::{Result, ScreenHubError};
@@ -52,6 +52,7 @@ impl ScreenHandle {
 }
 
 /// Internal state behind the `Arc`.
+#[derive(Default)]
 struct ScreenRegistryInner {
     senders: RwLock<HashMap<ScreenId, mpsc::Sender<ScreenEnvelope>>>,
 }
@@ -73,7 +74,7 @@ impl ScreenRegistryInner {
 ///
 /// Routing logic lives in [`crate::router::ScreenRouter`], not here.
 /// This struct is purely about connection lifecycle.
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct ScreenRegistry {
     inner: Arc<ScreenRegistryInner>,
 }
@@ -194,10 +195,15 @@ mod tests {
 
         let envelope = test_envelope(
             ScreenId::BackScreen,
-            ScreenTarget::Screen { id: ScreenId::FrontScreen },
+            ScreenTarget::Screen {
+                id: ScreenId::FrontScreen,
+            },
         );
 
-        let sent = registry.send_to(ScreenId::FrontScreen, &envelope).await.unwrap();
+        let sent = registry
+            .send_to(ScreenId::FrontScreen, &envelope)
+            .await
+            .unwrap();
         assert!(sent);
 
         let received = rx.try_recv().unwrap();
@@ -220,10 +226,15 @@ mod tests {
 
         let envelope = test_envelope(
             ScreenId::FrontScreen,
-            ScreenTarget::Screen { id: ScreenId::BackScreen },
+            ScreenTarget::Screen {
+                id: ScreenId::BackScreen,
+            },
         );
 
-        let sent = registry.send_to(ScreenId::BackScreen, &envelope).await.unwrap();
+        let sent = registry
+            .send_to(ScreenId::BackScreen, &envelope)
+            .await
+            .unwrap();
         assert!(!sent);
     }
 
@@ -231,9 +242,21 @@ mod tests {
     async fn broadcast_excludes_sender() {
         let registry = ScreenRegistry::new();
 
-        let (mut front_rx, _fg) = registry.register(ScreenId::FrontScreen).await.unwrap().into_parts();
-        let (mut back_rx, _bg) = registry.register(ScreenId::BackScreen).await.unwrap().into_parts();
-        let (mut dmd_rx, _dg) = registry.register(ScreenId::DmdScreen).await.unwrap().into_parts();
+        let (mut front_rx, _fg) = registry
+            .register(ScreenId::FrontScreen)
+            .await
+            .unwrap()
+            .into_parts();
+        let (mut back_rx, _bg) = registry
+            .register(ScreenId::BackScreen)
+            .await
+            .unwrap()
+            .into_parts();
+        let (mut dmd_rx, _dg) = registry
+            .register(ScreenId::DmdScreen)
+            .await
+            .unwrap()
+            .into_parts();
 
         let envelope = test_envelope(ScreenId::FrontScreen, ScreenTarget::Broadcast);
         registry.broadcast(&envelope, ScreenId::FrontScreen).await;

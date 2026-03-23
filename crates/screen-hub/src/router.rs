@@ -193,11 +193,17 @@ mod tests {
         let registry = ScreenRegistry::new();
         let router = ScreenRouter::new(registry.clone());
 
-        let (mut rx, _guard) = registry.register(ScreenId::BackScreen).await.unwrap().into_parts();
+        let (mut rx, _guard) = registry
+            .register(ScreenId::BackScreen)
+            .await
+            .unwrap()
+            .into_parts();
 
         let env = envelope(
             ScreenId::FrontScreen,
-            ScreenTarget::Screen { id: ScreenId::BackScreen },
+            ScreenTarget::Screen {
+                id: ScreenId::BackScreen,
+            },
         );
 
         let result = router.dispatch(env).await;
@@ -216,7 +222,9 @@ mod tests {
 
         let env = envelope(
             ScreenId::FrontScreen,
-            ScreenTarget::Screen { id: ScreenId::DmdScreen },
+            ScreenTarget::Screen {
+                id: ScreenId::DmdScreen,
+            },
         );
 
         let result = router.dispatch(env).await;
@@ -229,9 +237,21 @@ mod tests {
         let registry = ScreenRegistry::new();
         let router = ScreenRouter::new(registry.clone());
 
-        let (mut front_rx, _fg) = registry.register(ScreenId::FrontScreen).await.unwrap().into_parts();
-        let (mut back_rx, _bg) = registry.register(ScreenId::BackScreen).await.unwrap().into_parts();
-        let (_dmd_rx, _dg) = registry.register(ScreenId::DmdScreen).await.unwrap().into_parts();
+        let (mut front_rx, _fg) = registry
+            .register(ScreenId::FrontScreen)
+            .await
+            .unwrap()
+            .into_parts();
+        let (mut back_rx, _bg) = registry
+            .register(ScreenId::BackScreen)
+            .await
+            .unwrap()
+            .into_parts();
+        let (_dmd_rx, _dg) = registry
+            .register(ScreenId::DmdScreen)
+            .await
+            .unwrap()
+            .into_parts();
 
         let env = envelope(ScreenId::DmdScreen, ScreenTarget::Broadcast);
 
@@ -248,11 +268,17 @@ mod tests {
         let mut router = ScreenRouter::new(registry.clone());
         router.add_interceptor(Box::new(Swallow));
 
-        let (mut rx, _guard) = registry.register(ScreenId::BackScreen).await.unwrap().into_parts();
+        let (mut rx, _guard) = registry
+            .register(ScreenId::BackScreen)
+            .await
+            .unwrap()
+            .into_parts();
 
         let env = envelope(
             ScreenId::FrontScreen,
-            ScreenTarget::Screen { id: ScreenId::BackScreen },
+            ScreenTarget::Screen {
+                id: ScreenId::BackScreen,
+            },
         );
 
         let result = router.dispatch(env).await;
@@ -268,11 +294,17 @@ mod tests {
         let mut router = ScreenRouter::new(registry.clone());
         router.add_interceptor(Box::new(Mutator));
 
-        let (mut rx, _guard) = registry.register(ScreenId::BackScreen).await.unwrap().into_parts();
+        let (mut rx, _guard) = registry
+            .register(ScreenId::BackScreen)
+            .await
+            .unwrap()
+            .into_parts();
 
         let env = envelope(
             ScreenId::FrontScreen,
-            ScreenTarget::Screen { id: ScreenId::BackScreen },
+            ScreenTarget::Screen {
+                id: ScreenId::BackScreen,
+            },
         );
 
         router.dispatch(env).await;
@@ -288,11 +320,17 @@ mod tests {
         router.add_interceptor(Box::new(PassThrough));
         router.add_interceptor(Box::new(Mutator));
 
-        let (mut rx, _guard) = registry.register(ScreenId::BackScreen).await.unwrap().into_parts();
+        let (mut rx, _guard) = registry
+            .register(ScreenId::BackScreen)
+            .await
+            .unwrap()
+            .into_parts();
 
         let env = envelope(
             ScreenId::FrontScreen,
-            ScreenTarget::Screen { id: ScreenId::BackScreen },
+            ScreenTarget::Screen {
+                id: ScreenId::BackScreen,
+            },
         );
 
         router.dispatch(env).await;
@@ -308,11 +346,17 @@ mod tests {
         router.add_interceptor(Box::new(Swallow));
         router.add_interceptor(Box::new(Mutator)); // should never run
 
-        let (mut rx, _guard) = registry.register(ScreenId::BackScreen).await.unwrap().into_parts();
+        let (mut rx, _guard) = registry
+            .register(ScreenId::BackScreen)
+            .await
+            .unwrap()
+            .into_parts();
 
         let env = envelope(
             ScreenId::FrontScreen,
-            ScreenTarget::Screen { id: ScreenId::BackScreen },
+            ScreenTarget::Screen {
+                id: ScreenId::BackScreen,
+            },
         );
 
         let result = router.dispatch(env).await;

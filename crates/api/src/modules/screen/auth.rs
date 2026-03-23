@@ -25,7 +25,10 @@ pub enum AuthError {
     InvalidToken(#[from] jsonwebtoken::errors::Error),
 
     #[error("screen_id mismatch: token claims '{claimed}' but route says '{expected}'")]
-    ScreenMismatch { claimed: ScreenId, expected: ScreenId },
+    ScreenMismatch {
+        claimed: ScreenId,
+        expected: ScreenId,
+    },
 }
 
 /// Verify a screen JWT and return the claimed `ScreenId`.
@@ -73,6 +76,7 @@ pub fn verify_and_match(
 ///
 /// In production, tokens are generated once and stored in `.env` files.
 /// Also used by the `generate-tokens` binary to create initial `.env` values.
+#[cfg(test)]
 pub fn generate_screen_token(screen_id: ScreenId, secret: &[u8]) -> Result<String, AuthError> {
     let claims = ScreenClaims {
         sub: screen_id.to_string(),

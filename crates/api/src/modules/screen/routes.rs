@@ -1,8 +1,8 @@
+use axum::Router;
 use axum::extract::State;
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use axum::routing::{get, post};
-use axum::Router;
 use serde::{Deserialize, Serialize};
 use shared::screen::{ScreenEnvelope, ScreenId};
 use tracing::{debug, warn};
@@ -41,7 +41,10 @@ pub async fn connected_screens(State(state): State<AppState>) -> impl IntoRespon
     let screens = state.screen_registry.connected_screens().await;
     let count = screens.len();
     debug!(count, "listing connected screens");
-    (StatusCode::OK, axum::Json(ConnectedScreensResponse { screens, count }))
+    (
+        StatusCode::OK,
+        axum::Json(ConnectedScreensResponse { screens, count }),
+    )
 }
 
 /// Debug endpoint — inject a `ScreenEnvelope` without a real WS connection.
@@ -103,13 +106,19 @@ mod tests {
         let app = router().with_state(test_state());
 
         let resp = app
-            .oneshot(Request::get("/api/v1/screens/connected").body(Body::empty()).unwrap())
+            .oneshot(
+                Request::get("/api/v1/screens/connected")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
             .await
             .unwrap();
 
         assert_eq!(resp.status(), StatusCode::OK);
 
-        let body = axum::body::to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
         let data: ConnectedScreensResponse = serde_json::from_slice(&body).unwrap();
 
         assert_eq!(data.count, 0);
@@ -139,7 +148,9 @@ mod tests {
 
         assert_eq!(resp.status(), StatusCode::OK);
 
-        let body = axum::body::to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
         let data: SendResponse = serde_json::from_slice(&body).unwrap();
 
         assert_eq!(data.delivered, 0);

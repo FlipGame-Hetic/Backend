@@ -97,9 +97,18 @@ mod tests {
 
     #[test]
     fn screen_id_accepts_kebab_case() {
-        assert_eq!("front-screen".parse::<ScreenId>().unwrap(), ScreenId::FrontScreen);
-        assert_eq!("back-screen".parse::<ScreenId>().unwrap(), ScreenId::BackScreen);
-        assert_eq!("dmd-screen".parse::<ScreenId>().unwrap(), ScreenId::DmdScreen);
+        assert_eq!(
+            "front-screen".parse::<ScreenId>().unwrap(),
+            ScreenId::FrontScreen
+        );
+        assert_eq!(
+            "back-screen".parse::<ScreenId>().unwrap(),
+            ScreenId::BackScreen
+        );
+        assert_eq!(
+            "dmd-screen".parse::<ScreenId>().unwrap(),
+            ScreenId::DmdScreen
+        );
     }
 
     #[test]
@@ -127,7 +136,9 @@ mod tests {
 
     #[test]
     fn screen_target_serde_specific() {
-        let target = ScreenTarget::Screen { id: ScreenId::BackScreen };
+        let target = ScreenTarget::Screen {
+            id: ScreenId::BackScreen,
+        };
         let json = serde_json::to_string(&target).unwrap();
         assert!(json.contains("back_screen"));
 
@@ -139,7 +150,9 @@ mod tests {
     fn screen_envelope_serde_roundtrip() {
         let envelope = ScreenEnvelope {
             from: ScreenId::FrontScreen,
-            to: ScreenTarget::Screen { id: ScreenId::BackScreen },
+            to: ScreenTarget::Screen {
+                id: ScreenId::BackScreen,
+            },
             event_type: "game_state_update".to_owned(),
             payload: serde_json::json!({ "score": 42 }),
         };
