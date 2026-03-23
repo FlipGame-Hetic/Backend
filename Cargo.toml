@@ -2,6 +2,7 @@
 members = [
     "crates/api",
     "crates/mqtt-bridge",
+    "crates/screen-hub",
     "crates/shared",
 ]
 resolver = "3"

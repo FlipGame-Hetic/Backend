@@ -30,6 +30,10 @@ rustup default stable       # Rust 1.89+
 cargo build                 # Build workspace
 cargo test                  # 16 tests (shared + api + bridge)
 ```
+Documentation of the codebase:
+```bash
+cargo doc --open
+```
 
 ## Tech stack
 

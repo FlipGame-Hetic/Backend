@@ -31,11 +31,12 @@ RUN cargo build --release --bin ${CRATE}
 # ---------- Runtime minimal ----------
 FROM debian:bookworm-slim AS runtime
 
-RUN apt-get update \
+RUN sed -i 's|http://deb.debian.org|http://cdn-aws.deb.debian.org|g' /etc/apt/sources.list.d/debian.sources \
+    && apt-get update \
     && apt-get install -y --no-install-recommends \
-        ca-certificates \
         wget \
         libssl3 \
+        ca-certificates \
     && rm -rf /var/lib/apt/lists/* \
     && groupadd --system app \
     && useradd --system --gid app --no-create-home app
