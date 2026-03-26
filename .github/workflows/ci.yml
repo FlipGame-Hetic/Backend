@@ -72,7 +72,7 @@ jobs:
           fetch-depth: 0
 
       - name: TruffleHog secrets scan
-        uses: trufflesecurity/trufflehog@main
+        uses: trufflesecurity/trufflehog@v3.94.1
         with:
           path: .
           base: ${{ github.event.pull_request.base.sha }}
@@ -80,7 +80,7 @@ jobs:
           extra_args: --only-verified
 
       - name: Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@v0.69.3
         with:
           scan-type: fs
           scan-ref: .
