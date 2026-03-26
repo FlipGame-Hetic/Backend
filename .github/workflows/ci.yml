@@ -80,10 +80,11 @@ jobs:
           extra_args: --only-verified
 
       - name: Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@v0.69.3
+        uses: aquasecurity/trivy-action@v0.35.0
         with:
           scan-type: fs
           scan-ref: .
           format: table
           exit-code: 1
           severity: CRITICAL,HIGH
+          trivy-version: v0.69.3
