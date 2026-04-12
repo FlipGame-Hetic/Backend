@@ -3,6 +3,7 @@ use axum::extract::{Path, Query, State, WebSocketUpgrade};
 use axum::response::IntoResponse;
 use futures_util::{SinkExt, StreamExt};
 use serde::Deserialize;
+use shared::events::BumperHit;
 use shared::screen::{ScreenEnvelope, ScreenId};
 use tracing::{debug, error, info, warn};
 
@@ -129,6 +130,22 @@ async fn read_loop(
                 "screen tried to spoof 'from' field, ignoring"
             );
             continue;
+        }
+
+        if envelope.event_type == "Bumper" {
+            match serde_json::from_value::<BumperHit>(envelope.payload.clone()) {
+                Ok(hit) => {
+                    info!(
+                        screen = %screen_id,
+                        bumper_id = hit.bumper_id,
+                        "bumper hit received"
+                    );
+                }
+                Err(e) => {
+                    warn!(screen = %screen_id, error = %e, "invalid BumperHit payload");
+                    continue;
+                }
+            }
         }
 
         let result = state.screen_router.dispatch(envelope).await;
