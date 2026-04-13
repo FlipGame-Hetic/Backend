@@ -53,6 +53,17 @@ pub struct DeviceStatus {
     pub gyro_ok: bool,
 }
 
+// Frontend Screen => Backend
+
+/// Sent by a frontend screen when a physical bumper is hit.
+///
+/// Transported inside a [`crate::screen::ScreenEnvelope`] with
+/// `event_type = "Bumper"` and this struct as the `payload`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct BumperHit {
+    pub bumper_id: u8,
+}
+
 // Server => ESP32
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -104,6 +115,40 @@ pub enum OutboundMessage {
     BallHit(BallHit),
     GameState(GameState),
     Command(Command),
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn bumper_hit_serializes_correctly() {
+        let hit = BumperHit { bumper_id: 10 };
+        let json = serde_json::to_string(&hit).unwrap();
+        assert_eq!(json, r#"{"bumper_id":10}"#);
+    }
+
+    #[test]
+    fn bumper_hit_deserializes_correctly() {
+        let json = r#"{"bumper_id":10}"#;
+        let hit: BumperHit = serde_json::from_str(json).unwrap();
+        assert_eq!(hit, BumperHit { bumper_id: 10 });
+    }
+
+    #[test]
+    fn bumper_hit_roundtrip() {
+        let hit = BumperHit { bumper_id: 255 };
+        let json = serde_json::to_string(&hit).unwrap();
+        let parsed: BumperHit = serde_json::from_str(&json).unwrap();
+        assert_eq!(hit, parsed);
+    }
+
+    #[test]
+    fn bumper_hit_rejects_out_of_range_payload() {
+        // u8 max is 255, values > 255 should fail deserialization
+        let json = r#"{"bumper_id":256}"#;
+        assert!(serde_json::from_str::<BumperHit>(json).is_err());
+    }
 }
 
 // WebSocket envelope (Bridge ↔ API)
