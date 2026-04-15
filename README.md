@@ -8,6 +8,7 @@ Rust backend for the connected pinball system. ESP32 (MQTT) <-> Central API (Web
 crates/
 ├── api/            # HTTP + WebSocket server (Axum)
 ├── mqtt-bridge/    # Bidirectional relay MQTT <-> WebSocket
+├── screen-hub/    # Bidirectional relay Frontend apps <-> Frontend app & Frontend apps <-> Backend
 └── shared/         # Types, events, DTOs shared across crates
 ```
 ## Quickstart
@@ -34,6 +35,22 @@ Documentation of the codebase:
 ```bash
 cargo doc --open
 ```
+## How to run the tests (with Cargo)
+
+Installation
+```
+cargo install cargo-llvm-cov
+```
+Run the tests + report in the terminal
+```
+cargo llvm-cov
+```
+HTML report + Tab of the coverage
+```
+cargo llvm-cov --html
+```
+(Last testing 15/04/2026: ~61.5% codecoverage)
+
 
 ## Tech stack
 
