@@ -2,6 +2,17 @@
 
 Rust backend for the connected pinball system. ESP32 (MQTT) <-> Central API (WebSocket) communication.
 
+## If you work on my backend, please respect the following rules
+- 1 feature = add unit tests
+- Follow DRY & SOLID principles
+- Write clean code (meaningful variable names, use named constants, etc.)
+- Add inline comments `//` and doc comments `///` for important parts
+
+### PR & commit rules
+- One PR = one concern
+- Commit messages must be descriptive (please follow the convention)
+
+
 ## Architecture
 
 ```
