@@ -2,6 +2,7 @@ use axum::Router;
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use axum::routing::get;
+use lucy::lucy_http;
 use serde::Serialize;
 use utoipa::ToSchema;
 
@@ -16,15 +17,7 @@ pub fn router() -> Router<AppState> {
     Router::new().route("/health", get(health_check))
 }
 
-// for the scalar docs
-#[utoipa::path(
-    get,
-    path = "/health",
-    tag = "health",
-    responses(
-        (status = 200, description = "Service is healthy", body = HealthResponse),
-    )
-)]
+#[lucy_http(method = "GET", path = "/health", tags = "system", description = "Returns 200 OK when the service is up")]
 pub async fn health_check() -> impl IntoResponse {
     (StatusCode::OK, axum::Json(HealthResponse { status: "ok" }))
 }

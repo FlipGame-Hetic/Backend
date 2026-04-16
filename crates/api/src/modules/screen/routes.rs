@@ -3,6 +3,7 @@ use axum::extract::State;
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use axum::routing::{get, post};
+use lucy::{lucy_http};
 use serde::{Deserialize, Serialize};
 use shared::screen::{ScreenEnvelope, ScreenId};
 use tracing::{debug, warn};
@@ -37,6 +38,12 @@ pub fn router() -> Router<AppState> {
         (status = 200, description = "Connected screens", body = ConnectedScreensResponse),
     )
 )]
+#[lucy_http(
+    method      = "GET",
+    path        = "/api/v1/screens/connected",
+    tags        = "screens",
+    description = "List all currently connected screens",
+)]
 pub async fn connected_screens(State(state): State<AppState>) -> impl IntoResponse {
     let screens = state.screen_registry.connected_screens().await;
     let count = screens.len();
@@ -66,6 +73,12 @@ pub async fn connected_screens(State(state): State<AppState>) -> impl IntoRespon
         (status = 200, description = "Dispatched", body = SendResponse),
         (status = 422, description = "Invalid envelope"),
     )
+)]
+#[lucy_http(
+    method      = "POST",
+    path        = "/api/v1/screens/send",
+    tags        = "screens",
+    description = "Inject a ScreenEnvelope for debug dispatch without a real WS connection",
 )]
 pub async fn send_to_screen(
     State(state): State<AppState>,

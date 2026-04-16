@@ -33,7 +33,7 @@ docker compose up -d mosquitto        # Broker only (for MQTT Explorer)
 | API       | 8080 | REST + WS (`/ws/bridge`, `/health`) |
 | Mosquitto | 1883 | MQTT broker (anonymous)             |
 | Nginx     | 80   | Reverse proxy                       |
-| Scalar    | 8080 | OpenAPI docs (`/docs`)              |
+| Lucy    | 8080 | Custom docs (`/docs`)              |
 
 ## Local dev (without Docker)
 

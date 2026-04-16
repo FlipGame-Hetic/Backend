@@ -2,6 +2,7 @@ use axum::extract::ws::{Message, WebSocket};
 use axum::extract::{Path, Query, State, WebSocketUpgrade};
 use axum::response::IntoResponse;
 use futures_util::{SinkExt, StreamExt};
+use lucy::lucy_ws;
 use serde::Deserialize;
 use shared::events::BumperHit;
 use shared::screen::{ScreenEnvelope, ScreenId};
@@ -18,10 +19,13 @@ pub struct TokenQuery {
     pub token: String,
 }
 
-/// `GET /ws/screen/:screen_id?token=xxx`
-///
-/// Upgrades HTTP to WebSocket after verifying the JWT.
-/// The token must contain a `screen_id` claim matching the URL path.
+/// Upgrades HTTP to WebSocket for a screen connection.
+/// Requires a valid JWT (`?token=`) whose `screen_id` claim matches the path param.
+#[lucy_ws(
+    path        = "/ws/screen/{screen_id}",
+    tags        = "screens, realtime",
+    description = "Per-screen WebSocket, authenticated by JWT, relays ScreenEnvelope frames",
+)]
 pub async fn ws_screen(
     ws: WebSocketUpgrade,
     Path(screen_id_raw): Path<String>,
