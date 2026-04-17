@@ -26,6 +26,7 @@ dependencies = [
  "jsonwebtoken",
  "lucy",
  "reqwest",
+ "schemars",
  "screen-hub",
  "serde",
  "serde_json",
@@ -882,6 +883,8 @@ dependencies = [
  "lucy-core",
  "lucy-macro",
  "lucy-types",
+ "schemars",
+ "serde_json",
 ]
 
 [[package]]
@@ -1672,6 +1675,7 @@ dependencies = [
 name = "shared"
 version = "0.1.0"
 dependencies = [
+ "schemars",
  "serde",
  "serde_json",
  "thiserror",

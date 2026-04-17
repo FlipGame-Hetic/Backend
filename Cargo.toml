@@ -20,3 +20,4 @@ thiserror = "2"
 rumqttc = "0.25"
 tokio-tungstenite = { version = "0.26", features = ["native-tls"] }
 futures-util = "0.3"
+schemars = "0.8.22"

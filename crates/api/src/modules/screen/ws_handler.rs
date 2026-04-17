@@ -24,6 +24,7 @@ pub struct TokenQuery {
 #[lucy_ws(
     path        = "/ws/screen/{screen_id}",
     tags        = "screens, realtime",
+    request     = ScreenEnvelope,
     description = "Per-screen WebSocket, authenticated by JWT, relays ScreenEnvelope frames",
 )]
 pub async fn ws_screen(

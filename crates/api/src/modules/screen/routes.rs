@@ -3,7 +3,8 @@ use axum::extract::State;
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use axum::routing::{get, post};
-use lucy::{lucy_http};
+use lucy::lucy_http;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use shared::screen::{ScreenEnvelope, ScreenId};
 use tracing::{debug, warn};
@@ -11,13 +12,13 @@ use utoipa::ToSchema;
 
 use crate::state::AppState;
 
-#[derive(Debug, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Serialize, Deserialize, ToSchema, JsonSchema)]
 pub struct ConnectedScreensResponse {
     pub screens: Vec<ScreenId>,
     pub count: usize,
 }
 
-#[derive(Debug, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Serialize, Deserialize, ToSchema, JsonSchema)]
 pub struct SendResponse {
     pub delivered: usize,
     pub missed: Vec<ScreenId>,
@@ -42,6 +43,7 @@ pub fn router() -> Router<AppState> {
     method      = "GET",
     path        = "/api/v1/screens/connected",
     tags        = "screens",
+    response    = ConnectedScreensResponse,
     description = "List all currently connected screens",
 )]
 pub async fn connected_screens(State(state): State<AppState>) -> impl IntoResponse {
@@ -78,6 +80,8 @@ pub async fn connected_screens(State(state): State<AppState>) -> impl IntoRespon
     method      = "POST",
     path        = "/api/v1/screens/send",
     tags        = "screens",
+    request     = ScreenEnvelope,
+    response    = SendResponse,
     description = "Inject a ScreenEnvelope for debug dispatch without a real WS connection",
 )]
 pub async fn send_to_screen(
