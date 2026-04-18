@@ -24,7 +24,7 @@ dependencies = [
  "axum",
  "futures-util",
  "jsonwebtoken",
- "lucy",
+ "lucyd",
  "reqwest",
  "schemars",
  "screen-hub",
@@ -876,20 +876,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5e5032e24019045c762d3c0f28f5b6b8bbf38563a65908389bf7978758920897"
 
 [[package]]
-name = "lucy"
-version = "0.1.0"
-dependencies = [
- "inventory",
- "lucy-core",
- "lucy-macro",
- "lucy-types",
- "schemars",
- "serde_json",
-]
-
-[[package]]
 name = "lucy-core"
-version = "0.1.0"
+version = "0.1.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cb2a182da07f35e1674dc216c91c147a45202d7a56324abc9fdc76e669f0fa2f"
 dependencies = [
  "axum",
  "inventory",
@@ -901,7 +891,9 @@ dependencies = [
 
 [[package]]
 name = "lucy-macro"
-version = "0.1.0"
+version = "0.1.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "58c2520ba716e10d0a20170dfe2dcddb08b11e50534752722e0e0ac6e01f9d41"
 dependencies = [
  "inventory",
  "lucy-types",
@@ -912,11 +904,27 @@ dependencies = [
 
 [[package]]
 name = "lucy-types"
-version = "0.1.0"
+version = "0.1.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2ce3d7f2e824adbd5e1929e065fdc32efd440ee115565f415fe396727d734f2a"
 dependencies = [
  "inventory",
  "schemars",
  "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "lucyd"
+version = "0.1.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "36c1ec3bfd1e06a01b7be6796f7d35ae235b6c4ac735b4503fe8bed2fbe5cc50"
+dependencies = [
+ "inventory",
+ "lucy-core",
+ "lucy-macro",
+ "lucy-types",
+ "schemars",
  "serde_json",
 ]
 

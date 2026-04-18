@@ -2,7 +2,7 @@ use axum::extract::ws::{Message, WebSocket};
 use axum::extract::{Path, Query, State, WebSocketUpgrade};
 use axum::response::IntoResponse;
 use futures_util::{SinkExt, StreamExt};
-use lucy::lucy_ws;
+use lucyd::lucy_ws;
 use serde::Deserialize;
 use shared::events::BumperHit;
 use shared::screen::{ScreenEnvelope, ScreenId};

@@ -1,7 +1,7 @@
 services:
   api:
     build:
-      context: ../        # Flipper/ — includes both Backend/ and Lucy/ path deps
+      context: ../
       dockerfile: Backend/Dockerfile
       args:
         CRATE: api
@@ -19,7 +19,7 @@ services:
 
   mqtt-bridge:
     build:
-      context: ../        # Flipper/ — same context as api for cache sharing
+      context: ../
       dockerfile: Backend/Dockerfile
       args:
         CRATE: mqtt-bridge

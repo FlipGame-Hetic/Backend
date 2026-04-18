@@ -1,6 +1,6 @@
 use axum::Router;
 use axum::routing::get;
-use lucy::docs_router;
+use lucyd::docs_router;
 
 use crate::modules::health;
 use crate::modules::realtime::ws_handler;

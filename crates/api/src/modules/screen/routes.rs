@@ -3,7 +3,7 @@ use axum::extract::State;
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use axum::routing::{get, post};
-use lucy::lucy_http;
+use lucyd::lucy_http;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use shared::screen::{ScreenEnvelope, ScreenId};

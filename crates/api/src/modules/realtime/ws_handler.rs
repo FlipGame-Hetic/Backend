@@ -3,7 +3,7 @@ use axum::extract::{State, WebSocketUpgrade};
 use axum::response::IntoResponse;
 use futures_util::stream::SplitSink;
 use futures_util::{SinkExt, StreamExt};
-use lucy::lucy_ws;
+use lucyd::lucy_ws;
 use shared::events::WsMessage;
 use tokio::sync::broadcast;
 use tracing::{debug, error, info, warn};

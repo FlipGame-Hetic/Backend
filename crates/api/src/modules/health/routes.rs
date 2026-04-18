@@ -2,7 +2,7 @@ use axum::Router;
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use axum::routing::get;
-use lucy::lucy_http;
+use lucyd::lucy_http;
 use serde::Serialize;
 use utoipa::ToSchema;
 
