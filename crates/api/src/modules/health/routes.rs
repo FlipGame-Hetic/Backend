@@ -17,7 +17,12 @@ pub fn router() -> Router<AppState> {
     Router::new().route("/health", get(health_check))
 }
 
-#[lucy_http(method = "GET", path = "/health", tags = "system", description = "Returns 200 OK when the service is up")]
+#[lucy_http(
+    method = "GET",
+    path = "/health",
+    tags = "system",
+    description = "Returns 200 OK when the service is up"
+)]
 pub async fn health_check() -> impl IntoResponse {
     (StatusCode::OK, axum::Json(HealthResponse { status: "ok" }))
 }
