@@ -3,8 +3,8 @@ WORKDIR /app
 
 FROM chef AS planner
 
-COPY Cargo.toml Cargo.lock ./
-COPY crates ./crates
+COPY Backend/Cargo.toml Backend/Cargo.lock ./
+COPY Backend/crates ./crates
 
 RUN cargo chef prepare --recipe-path recipe.json
 
@@ -19,16 +19,17 @@ RUN sed -i 's|http://deb.debian.org|https://cdn-aws.deb.debian.org|g' /etc/apt/s
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=planner /app/recipe.json recipe.json
+
+# Compile all *dependencies* (cached layer — only re-runs when deps change)
 RUN cargo chef cook --release --recipe-path recipe.json
 
-COPY Cargo.toml Cargo.lock ./
-COPY crates ./crates
+# Copy the full workspace source and compile the application binary
+COPY Backend/Cargo.toml Backend/Cargo.lock ./
+COPY Backend/crates ./crates
 
 ARG CRATE=api
 RUN cargo build --release --bin ${CRATE}
 
-
-# ---------- Runtime minimal ----------
 FROM debian:bookworm-slim AS runtime
 
 RUN sed -i 's|http://deb.debian.org|http://cdn-aws.deb.debian.org|g' /etc/apt/sources.list.d/debian.sources \

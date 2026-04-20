@@ -1,11 +1,12 @@
 use std::fmt;
 use std::str::FromStr;
 
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 /// Fixed set of known frontend screens.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ScreenId {
     FrontScreen,
@@ -59,7 +60,7 @@ impl FromStr for ScreenId {
 }
 
 /// Routing target for a screen message.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema, JsonSchema)]
 #[serde(rename_all = "snake_case", tag = "kind")]
 pub enum ScreenTarget {
     /// Send to a single specific screen.
@@ -74,7 +75,7 @@ pub enum ScreenTarget {
 /// (e.g. "game_state_update", "score_change"). The `payload` is intentionally
 /// kept as `serde_json::Value` to stay flexible — strong typing will be layered
 /// on top when the processing pipeline is implemented.
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema, JsonSchema)]
 pub struct ScreenEnvelope {
     pub from: ScreenId,
     pub to: ScreenTarget,

@@ -3,6 +3,7 @@ use axum::extract::{State, WebSocketUpgrade};
 use axum::response::IntoResponse;
 use futures_util::stream::SplitSink;
 use futures_util::{SinkExt, StreamExt};
+use lucyd::lucy_ws;
 use shared::events::WsMessage;
 use tokio::sync::broadcast;
 use tracing::{debug, error, info, warn};
@@ -10,6 +11,11 @@ use tracing::{debug, error, info, warn};
 use crate::state::AppState;
 
 /// Axum handler: upgrade HTTP to WebSocket for a bridge connection.
+#[lucy_ws(
+    path = "/ws/bridge",
+    tags = "realtime",
+    description = "MQTT bridge WebSocket, bidirectional relay between the backend and the mqtt-bridge process"
+)]
 pub async fn ws_bridge(ws: WebSocketUpgrade, State(state): State<AppState>) -> impl IntoResponse {
     info!("bridge websocket upgrade requested");
     ws.on_upgrade(|socket| handle_bridge(socket, state))

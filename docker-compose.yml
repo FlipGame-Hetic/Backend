@@ -1,7 +1,8 @@
 services:
   api:
     build:
-      context: .
+      context: ../
+      dockerfile: Backend/Dockerfile
       args:
         CRATE: api
     ports:
@@ -18,7 +19,8 @@ services:
 
   mqtt-bridge:
     build:
-      context: .
+      context: ../
+      dockerfile: Backend/Dockerfile
       args:
         CRATE: mqtt-bridge
     depends_on:
@@ -31,6 +33,7 @@ services:
     image: eclipse-mosquitto:2
     ports:
       - "1883:1883"
+      - "9001:9001"        # MQTT over WebSocket (for browser clients via mqtt.js)
     volumes:
       - ./mosquitto.conf:/mosquitto/config/mosquitto.conf
     healthcheck:
@@ -44,13 +47,14 @@ services:
     image: nginx:alpine
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./nginx/default.d:/etc/nginx/default.d   # server block + WebSocket proxy rules
     ports:
       - "80:80"
     depends_on:
       api:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80/"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/nginx/health"]
       interval: 30s
       timeout: 5s
       start_period: 5s
