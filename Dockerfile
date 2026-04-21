@@ -20,7 +20,7 @@ RUN sed -i 's|http://deb.debian.org|https://cdn-aws.deb.debian.org|g' /etc/apt/s
 
 COPY --from=planner /app/recipe.json recipe.json
 
-# Compile all *dependencies* (cached layer — only re-runs when deps change)
+# Compile all *dependencies* (cached layer only re-runs when deps change)
 RUN cargo chef cook --release --recipe-path recipe.json
 
 # Copy the full workspace source and compile the application binary
