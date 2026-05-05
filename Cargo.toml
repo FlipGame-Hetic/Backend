@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "crates/api",
+    "crates/game-logic",
     "crates/mqtt-bridge",
     "crates/screen-hub",
     "crates/shared",
