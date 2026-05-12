@@ -56,13 +56,11 @@ impl PveEngine {
                 }
             }
 
-            GameEvent::BallLost => {
-                if game_state.lives == 0 {
-                    self.state.phase = PvePhase::GameOver;
-                    extra_events.push(GameEvent::GameOverTriggered {
-                        reason: GameOverReason::NoLivesLeft,
-                    });
-                }
+            GameEvent::BallLost if game_state.lives == 0 => {
+                self.state.phase = PvePhase::GameOver;
+                extra_events.push(GameEvent::GameOverTriggered {
+                    reason: GameOverReason::NoLivesLeft,
+                });
             }
 
             _ => {}
