@@ -1,19 +1,32 @@
 use std::time::{Duration, Instant};
 
 use crate::engine::config::{
-    SKILL_COMBO_MULTIPLIER_DURATION_MS, SKILL_COMBO_MULTIPLIER_FACTOR, SKILL_DAMAGE_BOOST_DURATION_MS,
-    SKILL_DAMAGE_BOOST_MULTIPLIER, SKILL_EXTRA_FLIPPERS_DURATION_MS, SKILL_FREEZE_DURATION_MS,
-    SKILL_PORTAL_BONUS_PTS, SKILL_SHIELD_DURATION_MS, SKILL_TIME_SLOWDOWN_DURATION_MS,
+    SKILL_COMBO_MULTIPLIER_DURATION_MS, SKILL_COMBO_MULTIPLIER_FACTOR,
+    SKILL_DAMAGE_BOOST_DURATION_MS, SKILL_DAMAGE_BOOST_MULTIPLIER,
+    SKILL_EXTRA_FLIPPERS_DURATION_MS, SKILL_FREEZE_DURATION_MS, SKILL_PORTAL_BONUS_PTS,
+    SKILL_SHIELD_DURATION_MS, SKILL_TIME_SLOWDOWN_DURATION_MS,
 };
 use crate::engine::states::GameState;
 
 #[derive(Debug, Clone)]
 pub enum SkillEffect {
-    ModifyMultiplier { factor: f32, duration_ms: u64 },
-    AddBalls { count: u8 },
-    ShieldActivated { duration_ms: u64 },
-    AddScore { pts: u32 },
-    EmitScreenEvent { event_type: String, payload: serde_json::Value },
+    ModifyMultiplier {
+        factor: f32,
+        duration_ms: u64,
+    },
+    AddBalls {
+        count: u8,
+    },
+    ShieldActivated {
+        duration_ms: u64,
+    },
+    AddScore {
+        pts: u32,
+    },
+    EmitScreenEvent {
+        event_type: String,
+        payload: serde_json::Value,
+    },
     NoEffect,
 }
 
@@ -35,8 +48,11 @@ impl BonusSkill {
         match self {
             Self::Shield => {
                 state.shield_active = true;
-                state.shield_expires_at = Some(now + Duration::from_millis(SKILL_SHIELD_DURATION_MS));
-                SkillEffect::ShieldActivated { duration_ms: SKILL_SHIELD_DURATION_MS }
+                state.shield_expires_at =
+                    Some(now + Duration::from_millis(SKILL_SHIELD_DURATION_MS));
+                SkillEffect::ShieldActivated {
+                    duration_ms: SKILL_SHIELD_DURATION_MS,
+                }
             }
             Self::DamageBoost => {
                 state.damage_multiplier = SKILL_DAMAGE_BOOST_MULTIPLIER;
@@ -65,7 +81,9 @@ impl BonusSkill {
                 state.extra_balls = state.extra_balls.saturating_add(1);
                 SkillEffect::AddBalls { count: 1 }
             }
-            Self::Portal => SkillEffect::AddScore { pts: SKILL_PORTAL_BONUS_PTS },
+            Self::Portal => SkillEffect::AddScore {
+                pts: SKILL_PORTAL_BONUS_PTS,
+            },
             Self::TimeSlowdown => SkillEffect::EmitScreenEvent {
                 event_type: "TimeSlowdown".to_owned(),
                 payload: serde_json::json!({ "duration_ms": SKILL_TIME_SLOWDOWN_DURATION_MS }),

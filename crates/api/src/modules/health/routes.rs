@@ -31,13 +31,24 @@ pub async fn health_check() -> impl IntoResponse {
 mod tests {
     use axum::body::Body;
     use axum::http::{Request, StatusCode};
+    use sqlx::SqlitePool;
     use tower::ServiceExt;
 
     use super::*;
 
+    async fn test_pool() -> SqlitePool {
+        let pool = SqlitePool::connect("sqlite::memory:").await.unwrap();
+        sqlx::migrate!("./migrations").run(&pool).await.unwrap();
+        pool
+    }
+
     #[tokio::test]
     async fn health_returns_ok() {
-        let app = router().with_state(AppState::new(b"flipper-dev-secret-change-in-prod".to_vec()));
+        let pool = test_pool().await;
+        let app = router().with_state(AppState::new(
+            b"flipper-dev-secret-change-in-prod".to_vec(),
+            pool,
+        ));
 
         let response = app
             .oneshot(Request::get("/health").body(Body::empty()).unwrap())

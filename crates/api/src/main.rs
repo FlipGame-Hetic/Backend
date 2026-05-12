@@ -1,14 +1,8 @@
+use api::app;
+use api::config::ApiConfig;
+use sqlx::SqlitePool;
 use tracing::{error, info};
 use tracing_subscriber::{EnvFilter, fmt};
-
-mod app;
-mod config;
-mod errors;
-mod modules;
-mod router;
-mod state;
-
-use config::ApiConfig;
 
 #[tokio::main]
 async fn main() {
@@ -22,11 +16,25 @@ async fn main() {
         }
     };
 
-    let addr = config.socket_addr();
+    let pool = match SqlitePool::connect(&config.database_url).await {
+        Ok(p) => p,
+        Err(e) => {
+            error!(error = %e, url = %config.database_url, "Failed to connect to database");
+            std::process::exit(1);
+        }
+    };
 
+    if let Err(e) = sqlx::migrate!("./migrations").run(&pool).await {
+        error!(error = %e, "Failed to run database migrations");
+        std::process::exit(1);
+    }
+
+    info!(url = %config.database_url, "Database ready");
+
+    let addr = config.socket_addr();
     info!(port = config.port, "Starting api server");
 
-    let app = app::build(&config);
+    let server = app::build(&config, pool);
 
     let listener = match tokio::net::TcpListener::bind(addr).await {
         Ok(l) => l,
@@ -38,7 +46,7 @@ async fn main() {
 
     info!(addr = %addr, "Listening");
 
-    if let Err(e) = axum::serve(listener, app).await {
+    if let Err(e) = axum::serve(listener, server).await {
         error!(error = %e, "Server exited with error");
         std::process::exit(1);
     }

@@ -21,8 +21,12 @@ pub struct Hacker;
 pub struct Cyborg;
 
 impl Character for RoboCop {
-    fn id(&self) -> u8 { 0 }
-    fn name(&self) -> &'static str { "RoboCop" }
+    fn id(&self) -> u8 {
+        0
+    }
+    fn name(&self) -> &'static str {
+        "RoboCop"
+    }
     fn stats(&self) -> &CharacterStats {
         static STATS: CharacterStats = CharacterStats {
             ultimate_charge_max: ROBOCP_ULTIMATE_MAX,
@@ -31,13 +35,21 @@ impl Character for RoboCop {
         };
         &STATS
     }
-    fn bonus(&self) -> BonusSkill { BonusSkill::Shield }
-    fn malus(&self) -> MalusSkill { MalusSkill::InkBlot }
+    fn bonus(&self) -> BonusSkill {
+        BonusSkill::Shield
+    }
+    fn malus(&self) -> MalusSkill {
+        MalusSkill::InkBlot
+    }
 }
 
 impl Character for JudgeDredd {
-    fn id(&self) -> u8 { 1 }
-    fn name(&self) -> &'static str { "Judge Dredd" }
+    fn id(&self) -> u8 {
+        1
+    }
+    fn name(&self) -> &'static str {
+        "Judge Dredd"
+    }
     fn stats(&self) -> &CharacterStats {
         static STATS: CharacterStats = CharacterStats {
             ultimate_charge_max: DREDD_ULTIMATE_MAX,
@@ -46,13 +58,21 @@ impl Character for JudgeDredd {
         };
         &STATS
     }
-    fn bonus(&self) -> BonusSkill { BonusSkill::DamageBoost }
-    fn malus(&self) -> MalusSkill { MalusSkill::BumperReduction }
+    fn bonus(&self) -> BonusSkill {
+        BonusSkill::DamageBoost
+    }
+    fn malus(&self) -> MalusSkill {
+        MalusSkill::BumperReduction
+    }
 }
 
 impl Character for Hacker {
-    fn id(&self) -> u8 { 2 }
-    fn name(&self) -> &'static str { "Hacker" }
+    fn id(&self) -> u8 {
+        2
+    }
+    fn name(&self) -> &'static str {
+        "Hacker"
+    }
     fn stats(&self) -> &CharacterStats {
         static STATS: CharacterStats = CharacterStats {
             ultimate_charge_max: HACKER_ULTIMATE_MAX,
@@ -61,13 +81,21 @@ impl Character for Hacker {
         };
         &STATS
     }
-    fn bonus(&self) -> BonusSkill { BonusSkill::ComboMultiplier }
-    fn malus(&self) -> MalusSkill { MalusSkill::Invisible }
+    fn bonus(&self) -> BonusSkill {
+        BonusSkill::ComboMultiplier
+    }
+    fn malus(&self) -> MalusSkill {
+        MalusSkill::Invisible
+    }
 }
 
 impl Character for Cyborg {
-    fn id(&self) -> u8 { 3 }
-    fn name(&self) -> &'static str { "Cyborg" }
+    fn id(&self) -> u8 {
+        3
+    }
+    fn name(&self) -> &'static str {
+        "Cyborg"
+    }
     fn stats(&self) -> &CharacterStats {
         static STATS: CharacterStats = CharacterStats {
             ultimate_charge_max: CYBORG_ULTIMATE_MAX,
@@ -76,8 +104,12 @@ impl Character for Cyborg {
         };
         &STATS
     }
-    fn bonus(&self) -> BonusSkill { BonusSkill::ExtraFlippers }
-    fn malus(&self) -> MalusSkill { MalusSkill::ModifyBounce }
+    fn bonus(&self) -> BonusSkill {
+        BonusSkill::ExtraFlippers
+    }
+    fn malus(&self) -> MalusSkill {
+        MalusSkill::ModifyBounce
+    }
 }
 
 pub fn select_character(id: u8) -> Box<dyn Character> {
@@ -87,7 +119,10 @@ pub fn select_character(id: u8) -> Box<dyn Character> {
         2 => Box::new(Hacker),
         3 => Box::new(Cyborg),
         unknown => {
-            tracing::warn!(character_id = unknown, "unknown character id, defaulting to RoboCop");
+            tracing::warn!(
+                character_id = unknown,
+                "unknown character id, defaulting to RoboCop"
+            );
             Box::new(RoboCop)
         }
     }

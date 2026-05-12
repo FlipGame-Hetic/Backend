@@ -9,8 +9,8 @@ pub fn scale_hp(base_hp: u32, boss_index: u8, endless_level: u32) -> u32 {
         1 => BOSS_1_DIFFICULTY_SCALE,
         2 => BOSS_2_DIFFICULTY_SCALE,
         _ => {
-            let endless_factor =
-                ENDLESS_BASE_DIFFICULTY_SCALE * ENDLESS_LEVEL_SCALE_EXPONENT.powi(endless_level as i32);
+            let endless_factor = ENDLESS_BASE_DIFFICULTY_SCALE
+                * ENDLESS_LEVEL_SCALE_EXPONENT.powi(endless_level as i32);
             return (base_hp as f32 * endless_factor) as u32;
         }
     };

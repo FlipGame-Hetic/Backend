@@ -7,13 +7,15 @@ use crate::combo::{ComboDetector, ComboResult, MultiplierState};
 use crate::engine::config::{DEFAULT_LIVES, ULTIME_CHARGE_RATIO};
 use crate::engine::events::{ButtonSide, GameEvent, GameOverReason};
 use crate::engine::pve::PveEngine;
-use crate::engine::scoring::{apply_tilt_penalty, score_bumper, score_bumper_triangle, timer_bonus};
+use crate::engine::scoring::{
+    apply_tilt_penalty, score_bumper, score_bumper_triangle, timer_bonus,
+};
 use crate::engine::states::{GamePhase, GameState, TiltEffect};
-use crate::player::personnages::character::{select_character, Character};
+use crate::player::personnages::character::{Character, select_character};
 use crate::player::skills::player_bonus::SkillEffect;
 
 pub struct GameEngine {
-    state: GameState,
+    pub state: GameState,
     combo_detector: ComboDetector,
     multiplier: MultiplierState,
     pve_engine: PveEngine,
@@ -133,11 +135,9 @@ impl GameEngine {
                 }
 
                 if self.state.lives == 0 {
-                    envelopes.extend(
-                        self.process(GameEvent::GameOverTriggered {
-                            reason: GameOverReason::NoLivesLeft,
-                        }),
-                    );
+                    envelopes.extend(self.process(GameEvent::GameOverTriggered {
+                        reason: GameOverReason::NoLivesLeft,
+                    }));
                 } else {
                     envelopes.push(self.emit_life_update());
                 }
@@ -312,7 +312,10 @@ impl GameEngine {
 
     fn apply_skill_effect(&mut self, effect: SkillEffect) -> Vec<ScreenEnvelope> {
         match effect {
-            SkillEffect::ModifyMultiplier { factor, duration_ms } => {
+            SkillEffect::ModifyMultiplier {
+                factor,
+                duration_ms,
+            } => {
                 let now = Instant::now();
                 let combo_effect = crate::combo::ComboEffect {
                     combo_id: 0,
@@ -338,7 +341,10 @@ impl GameEngine {
                 self.state.add_score(pts as u64);
                 vec![self.emit_score_update()]
             }
-            SkillEffect::EmitScreenEvent { event_type, payload } => {
+            SkillEffect::EmitScreenEvent {
+                event_type,
+                payload,
+            } => {
                 vec![make_event_envelope(&event_type, payload)]
             }
             SkillEffect::NoEffect => vec![],

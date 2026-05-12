@@ -138,8 +138,7 @@ impl ComboDetector {
                 continue;
             }
 
-            let tail: Vec<&(ButtonPress, Instant)> =
-                self.buffer.iter().rev().take(n).collect();
+            let tail: Vec<&(ButtonPress, Instant)> = self.buffer.iter().rev().take(n).collect();
 
             let matches = tail
                 .iter()
@@ -180,7 +179,9 @@ impl ComboDetector {
         let all_right = last.iter().all(|p| **p == ButtonPress::Right);
 
         if all_left || all_right {
-            Some(ComboResult::Penalty { pts: COMBO_PENALTY_PTS })
+            Some(ComboResult::Penalty {
+                pts: COMBO_PENALTY_PTS,
+            })
         } else {
             None
         }
@@ -257,7 +258,12 @@ mod tests {
         let mut d = ComboDetector::new();
         let now = Instant::now();
         let result = press_seq(&mut d, &[ButtonPress::Right; 7], now);
-        assert!(matches!(result, ComboResult::Penalty { pts: COMBO_PENALTY_PTS }));
+        assert!(matches!(
+            result,
+            ComboResult::Penalty {
+                pts: COMBO_PENALTY_PTS
+            }
+        ));
     }
 
     #[test]
@@ -265,7 +271,12 @@ mod tests {
         let mut d = ComboDetector::new();
         let now = Instant::now();
         let result = press_seq(&mut d, &[ButtonPress::Left; 7], now);
-        assert!(matches!(result, ComboResult::Penalty { pts: COMBO_PENALTY_PTS }));
+        assert!(matches!(
+            result,
+            ComboResult::Penalty {
+                pts: COMBO_PENALTY_PTS
+            }
+        ));
     }
 
     #[test]

@@ -85,15 +85,16 @@ impl PveEngine {
             self.state.endless_level += 1;
             if self.state.endless_level == 1 {
                 self.state.phase = PvePhase::Victory;
-                envelopes.push(make_event_envelope("VictoireFinale", serde_json::Value::Null));
+                envelopes.push(make_event_envelope(
+                    "VictoireFinale",
+                    serde_json::Value::Null,
+                ));
             } else {
                 // Endless: respawn AUTO with scaled HP
                 let level = self.state.endless_level;
                 let hp = scale_hp(BOSS_0_HP, 3, level);
                 self.boss = Boss::new_endless(BossKind::AUTO, level);
-                self.state
-                    .boss_health
-                    .reset_with_new_max(hp);
+                self.state.boss_health.reset_with_new_max(hp);
                 self.state.phase = PvePhase::Fighting;
                 envelopes.push(make_boss_update(
                     self.boss.kind.id(),
@@ -185,9 +186,11 @@ mod tests {
         let hp = pve.boss.health.max;
         let (_, events) = pve.on_event(&GameEvent::BumperHit { pts: hp }, &mut state);
 
-        assert!(events
-            .iter()
-            .any(|e| matches!(e, GameEvent::BossDefeated { boss_id: 0 })));
+        assert!(
+            events
+                .iter()
+                .any(|e| matches!(e, GameEvent::BossDefeated { boss_id: 0 }))
+        );
         assert_eq!(pve.current_boss_index(), 1);
     }
 
@@ -212,8 +215,10 @@ mod tests {
 
         let (_, events) = pve.on_event(&GameEvent::BallLost, &mut state);
 
-        assert!(events
-            .iter()
-            .any(|e| matches!(e, GameEvent::GameOverTriggered { .. })));
+        assert!(
+            events
+                .iter()
+                .any(|e| matches!(e, GameEvent::GameOverTriggered { .. }))
+        );
     }
 }

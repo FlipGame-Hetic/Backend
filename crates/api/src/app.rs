@@ -1,4 +1,5 @@
 use axum::Router;
+use sqlx::SqlitePool;
 use tower_http::cors::{Any, CorsLayer};
 use tower_http::trace::TraceLayer;
 
@@ -6,7 +7,7 @@ use crate::config::ApiConfig;
 use crate::router;
 use crate::state::AppState;
 
-pub fn build(config: &ApiConfig) -> Router {
+pub fn build(config: &ApiConfig, db_pool: SqlitePool) -> Router {
     let cors = CorsLayer::new()
         .allow_origin(
             config
@@ -18,7 +19,7 @@ pub fn build(config: &ApiConfig) -> Router {
         .allow_methods(Any)
         .allow_headers(Any);
 
-    let state = AppState::new(config.jwt_secret.as_bytes().to_vec());
+    let state = AppState::new(config.jwt_secret.as_bytes().to_vec(), db_pool);
 
     router::build()
         .layer(TraceLayer::new_for_http())

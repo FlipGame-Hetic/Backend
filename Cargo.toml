@@ -22,3 +22,5 @@ rumqttc = "0.25"
 tokio-tungstenite = { version = "0.26", features = ["native-tls"] }
 futures-util = "0.3"
 schemars = "0.8.22"
+game-logic = { path = "crates/game-logic" }
+sqlx = { version = "0.8", features = ["sqlite", "runtime-tokio", "macros", "migrate"] }
