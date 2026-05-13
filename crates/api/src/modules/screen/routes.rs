@@ -114,13 +114,15 @@ mod tests {
 
     use super::*;
 
-    fn test_state() -> AppState {
-        AppState::new(b"flipper-dev-secret-change-in-prod".to_vec())
+    async fn test_state() -> AppState {
+        let pool = sqlx::SqlitePool::connect("sqlite::memory:").await.unwrap();
+        sqlx::migrate!("./migrations").run(&pool).await.unwrap();
+        AppState::new(b"flipper-dev-secret-change-in-prod".to_vec(), pool)
     }
 
     #[tokio::test]
     async fn connected_screens_returns_empty_initially() {
-        let app = router().with_state(test_state());
+        let app = router().with_state(test_state().await);
 
         let resp = app
             .oneshot(
@@ -144,7 +146,7 @@ mod tests {
 
     #[tokio::test]
     async fn send_to_disconnected_screen_returns_missed() {
-        let app = router().with_state(test_state());
+        let app = router().with_state(test_state().await);
 
         let envelope = serde_json::json!({
             "from": "front_screen",
@@ -177,7 +179,7 @@ mod tests {
 
     #[tokio::test]
     async fn send_with_invalid_body_returns_422() {
-        let app = router().with_state(test_state());
+        let app = router().with_state(test_state().await);
 
         let resp = app
             .oneshot(

@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "crates/api",
+    "crates/game-logic",
     "crates/mqtt-bridge",
     "crates/screen-hub",
     "crates/shared",
@@ -17,7 +18,9 @@ lucyd = ">= 0.1.9"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 thiserror = "2"
-rumqttc = "0.25"
+rumqttc = { version = "0.25", default-features = false }
 tokio-tungstenite = { version = "0.26", features = ["native-tls"] }
 futures-util = "0.3"
 schemars = "0.8.22"
+game-logic = { path = "crates/game-logic" }
+sqlx = { version = "0.8", features = ["sqlite", "runtime-tokio", "macros", "migrate"] }

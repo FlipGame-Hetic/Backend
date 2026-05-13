@@ -2,25 +2,25 @@ use axum::extract::ws::{Message, WebSocket};
 use axum::extract::{Path, Query, State, WebSocketUpgrade};
 use axum::response::IntoResponse;
 use futures_util::{SinkExt, StreamExt};
+use game_logic::GameEngine;
 use lucyd::lucy_ws;
 use serde::Deserialize;
-use shared::events::BumperHit;
 use shared::screen::{ScreenEnvelope, ScreenId};
 use tracing::{debug, error, info, warn};
 
 use crate::errors::ApiError;
-use crate::state::AppState;
+use crate::modules::realtime::bridge_sync::sync_game_state_to_bridge;
+use crate::modules::scores::dto::SaveScoreRequest;
+use crate::modules::scores::service as score_service;
+use crate::state::{AppState, GameSession};
 
 use super::auth;
 
-/// Query parameter for the JWT token on WS upgrade.
 #[derive(Debug, Deserialize)]
 pub struct TokenQuery {
     pub token: String,
 }
 
-/// Upgrades HTTP to WebSocket for a screen connection.
-/// Requires a valid JWT (`?token=`) whose `screen_id` claim matches the path param.
 #[lucy_ws(
     path        = "/ws/screen/{screen_id}",
     tags        = "screens, realtime",
@@ -47,13 +47,6 @@ pub async fn ws_screen(
     Ok(ws.on_upgrade(move |socket| handle_screen(socket, screen_id, state)))
 }
 
-/// Full lifecycle of one screen WebSocket connection.
-///
-/// 1. Register in the `ScreenRegistry` (rejects if already connected).
-/// 2. Spawn two tasks:
-///    - **read**: parse `ScreenEnvelope` from WS frames, dispatch via `ScreenRouter`.
-///    - **write**: drain the `ScreenHandle.rx` channel and send frames to the client.
-/// 3. On disconnect, the `ScreenHandle` is dropped which auto-unregisters.
 async fn handle_screen(socket: WebSocket, screen_id: ScreenId, state: AppState) {
     info!(screen = %screen_id, "screen websocket connected");
 
@@ -87,11 +80,9 @@ async fn handle_screen(socket: WebSocket, screen_id: ScreenId, state: AppState) 
         }
     }
 
-    // `handle` is dropped here -> auto-unregister from the registry.
     info!(screen = %screen_id, "screen websocket disconnected");
 }
 
-/// Read frames from the screen, deserialize as `ScreenEnvelope`, and dispatch.
 async fn read_loop(
     screen_id: ScreenId,
     mut stream: futures_util::stream::SplitStream<WebSocket>,
@@ -127,7 +118,6 @@ async fn read_loop(
             }
         };
 
-        // Safety: verify the `from` field matches the authenticated screen.
         if envelope.from != screen_id {
             warn!(
                 screen = %screen_id,
@@ -137,24 +127,7 @@ async fn read_loop(
             continue;
         }
 
-        if envelope.event_type == "Bumper" {
-            match serde_json::from_value::<BumperHit>(envelope.payload.clone()) {
-                Ok(hit) => {
-                    info!(
-                        screen = %screen_id,
-                        bumper_id = hit.bumper_id,
-                        "bumper hit received"
-                    );
-                }
-                Err(e) => {
-                    warn!(screen = %screen_id, error = %e, "invalid BumperHit payload");
-                    continue;
-                }
-            }
-        }
-
-        let result = state.screen_router.dispatch(envelope).await;
-
+        let result = state.screen_router.dispatch(envelope.clone()).await;
         debug!(
             screen = %screen_id,
             delivered = result.delivered,
@@ -162,10 +135,135 @@ async fn read_loop(
             intercepted = result.intercepted,
             "dispatch result"
         );
+
+        process_screen_event(&state, &envelope).await;
     }
 }
 
-/// Drain the per-screen channel and forward envelopes as JSON text frames.
+async fn process_screen_event(state: &AppState, envelope: &ScreenEnvelope) {
+    if envelope.event_type == "StartGame" {
+        handle_start_game(state, envelope).await;
+    } else {
+        handle_game_event(state, envelope).await;
+    }
+}
+
+async fn handle_start_game(state: &AppState, envelope: &ScreenEnvelope) {
+    let player_id = envelope
+        .payload
+        .get("player_id")
+        .and_then(|v| v.as_str())
+        .unwrap_or("unknown")
+        .to_owned();
+    let character_id = envelope
+        .payload
+        .get("character_id")
+        .and_then(|v| v.as_u64())
+        .unwrap_or(1) as u8;
+
+    // Lock order: engine FIRST, session SECOND [§ 4.4]
+    let mut engine_guard = state.game_engine.lock().await;
+    let mut session_guard = state.active_session.lock().await;
+
+    // Policy: silently ignore if a game is already in progress [§ 4.2]
+    if session_guard.is_some() {
+        warn!("StartGame ignored — game already in progress");
+        drop(session_guard);
+        drop(engine_guard);
+        return;
+    }
+
+    let mut engine = GameEngine::new(character_id);
+    let envelopes = engine.process(game_logic::GameEvent::StartGame {
+        player_id: player_id.clone(),
+    });
+
+    let state_snapshot = engine.state.clone();
+
+    *engine_guard = Some(engine);
+    *session_guard = Some(GameSession {
+        player_id,
+        character_id,
+        boss_reached: 0,
+    });
+
+    // Unlock before any await [§ 4.4]
+    drop(session_guard);
+    drop(engine_guard);
+
+    let device_id = state.active_device_id.read().await.clone();
+    if device_id.is_none() {
+        warn!("no bridge connected — ESP32 sync skipped");
+    }
+
+    for env in envelopes {
+        let _ = state.screen_router.dispatch(env).await;
+    }
+
+    if let Some(id) = device_id {
+        sync_game_state_to_bridge(&state_snapshot, &state.hub, &id);
+    }
+}
+
+async fn handle_game_event(state: &AppState, envelope: &ScreenEnvelope) {
+    // Lock order: engine FIRST, session SECOND [§ 4.4]
+    let mut engine_guard = state.game_engine.lock().await;
+    let mut session_guard = state.active_session.lock().await;
+
+    let Some(engine) = engine_guard.as_mut() else {
+        drop(session_guard);
+        drop(engine_guard);
+        return;
+    };
+
+    let envelopes = engine.handle_screen_event(envelope);
+
+    for env in &envelopes {
+        if env.event_type == "BossDefeated"
+            && let Some(session) = session_guard.as_mut()
+        {
+            session.boss_reached = session.boss_reached.saturating_add(1);
+        }
+    }
+
+    let game_over = envelopes.iter().any(|e| e.event_type == "GameOver");
+    let score_snapshot = engine.state.score;
+    let state_snapshot = engine.state.clone();
+
+    let session_snapshot = if game_over {
+        *engine_guard = None;
+        session_guard.take()
+    } else {
+        None
+    };
+
+    // Unlock before any await [§ 4.4]
+    drop(session_guard);
+    drop(engine_guard);
+
+    let device_id = state.active_device_id.read().await.clone();
+
+    for env in envelopes {
+        let _ = state.screen_router.dispatch(env).await;
+    }
+
+    if let Some(id) = device_id {
+        sync_game_state_to_bridge(&state_snapshot, &state.hub, &id);
+    }
+
+    if game_over && let Some(session) = session_snapshot {
+        let req = SaveScoreRequest {
+            player_id: session.player_id,
+            character_id: session.character_id,
+            score: score_snapshot,
+            boss_reached: session.boss_reached,
+        };
+        if let Err(e) = score_service::save_score(&state.db_pool, req).await {
+            error!(error = %e, "failed to persist score after game over");
+        }
+    }
+}
+
 async fn write_loop(
     screen_id: ScreenId,
     mut rx: tokio::sync::mpsc::Receiver<ScreenEnvelope>,

@@ -17,6 +17,12 @@ pub struct BridgeHub {
     tx: broadcast::Sender<WsMessage>,
 }
 
+impl Default for BridgeHub {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl BridgeHub {
     pub fn new() -> Self {
         let (tx, _) = broadcast::channel(BROADCAST_CAPACITY);
@@ -27,5 +33,10 @@ impl BridgeHub {
     /// Subscribe to outbound messages. Each bridge connection calls this once.
     pub fn subscribe(&self) -> broadcast::Receiver<WsMessage> {
         self.tx.subscribe()
+    }
+
+    /// Send an outbound message to all connected bridges (fire-and-forget).
+    pub fn send(&self, msg: WsMessage) {
+        let _ = self.tx.send(msg);
     }
 }

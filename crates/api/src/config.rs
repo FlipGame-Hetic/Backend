@@ -13,6 +13,7 @@ pub struct ApiConfig {
     pub port: u16,
     pub allowed_origins: Vec<String>,
     pub jwt_secret: String,
+    pub database_url: String,
 }
 
 impl ApiConfig {
@@ -38,10 +39,14 @@ impl ApiConfig {
             ));
         }
 
+        let database_url =
+            std::env::var("DATABASE_URL").unwrap_or_else(|_| "sqlite://flipper.db".to_owned());
+
         Ok(Self {
             port,
             allowed_origins,
             jwt_secret,
+            database_url,
         })
     }
 
