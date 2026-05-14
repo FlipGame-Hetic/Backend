@@ -227,12 +227,7 @@ mod tests {
         let state = test_state().await;
         let app = router().with_state(state);
 
-        let (s1, _) = post(
-            app.clone(),
-            "/api/v1/game/start",
-            start_body("bob", 1),
-        )
-        .await;
+        let (s1, _) = post(app.clone(), "/api/v1/game/start", start_body("bob", 1)).await;
         assert_eq!(s1, StatusCode::OK);
 
         let (s2, body) = post(app, "/api/v1/game/start", start_body("bob", 1)).await;
@@ -255,12 +250,7 @@ mod tests {
         let state = test_state().await;
         let app = router().with_state(state);
 
-        let (s, _) = post(
-            app.clone(),
-            "/api/v1/game/start",
-            start_body("carol", 2),
-        )
-        .await;
+        let (s, _) = post(app.clone(), "/api/v1/game/start", start_body("carol", 2)).await;
         assert_eq!(s, StatusCode::OK);
 
         let (status, body) = get(app, "/api/v1/game/state").await;
@@ -283,20 +273,10 @@ mod tests {
         let state = test_state().await;
         let app = router().with_state(state);
 
-        let (s, _) = post(
-            app.clone(),
-            "/api/v1/game/start",
-            start_body("dave", 1),
-        )
-        .await;
+        let (s, _) = post(app.clone(), "/api/v1/game/start", start_body("dave", 1)).await;
         assert_eq!(s, StatusCode::OK);
 
-        let (s_end, body_end) = post(
-            app.clone(),
-            "/api/v1/game/end",
-            Body::empty(),
-        )
-        .await;
+        let (s_end, body_end) = post(app.clone(), "/api/v1/game/end", Body::empty()).await;
         assert_eq!(s_end, StatusCode::OK);
         assert_eq!(body_end["phase"], "game_over");
 

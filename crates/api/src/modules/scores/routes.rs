@@ -74,7 +74,11 @@ mod tests {
         AppState::new(b"flipper-dev-secret-change-in-prod".to_vec(), pool)
     }
 
-    async fn post(app: axum::Router, path: &str, body: serde_json::Value) -> (StatusCode, serde_json::Value) {
+    async fn post(
+        app: axum::Router,
+        path: &str,
+        body: serde_json::Value,
+    ) -> (StatusCode, serde_json::Value) {
         let resp = app
             .oneshot(
                 Request::post(path)
