@@ -155,3 +155,133 @@ pub async fn end_game(State(state): State<AppState>) -> Result<impl IntoResponse
         axum::Json(GameStateResponse::from(state_snapshot)),
     ))
 }
+
+#[cfg(test)]
+mod tests {
+    use axum::body::Body;
+    use axum::http::{Request, StatusCode};
+    use tower::ServiceExt;
+
+    use super::*;
+
+    async fn test_state() -> AppState {
+        let pool = sqlx::SqlitePool::connect("sqlite::memory:").await.unwrap();
+        sqlx::migrate!("./migrations").run(&pool).await.unwrap();
+        AppState::new(b"flipper-dev-secret-change-in-prod".to_vec(), pool)
+    }
+
+    fn start_body(player_id: &str, character_id: u8) -> Body {
+        Body::from(
+            serde_json::to_vec(&serde_json::json!({
+                "player_id": player_id,
+                "character_id": character_id
+            }))
+            .unwrap(),
+        )
+    }
+
+    async fn post(app: axum::Router, path: &str, body: Body) -> (StatusCode, serde_json::Value) {
+        let resp = app
+            .oneshot(
+                Request::post(path)
+                    .header("content-type", "application/json")
+                    .body(body)
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        let status = resp.status();
+        let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let json = serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null);
+        (status, json)
+    }
+
+    async fn get(app: axum::Router, path: &str) -> (StatusCode, serde_json::Value) {
+        let resp = app
+            .oneshot(Request::get(path).body(Body::empty()).unwrap())
+            .await
+            .unwrap();
+        let status = resp.status();
+        let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let json = serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null);
+        (status, json)
+    }
+
+    #[tokio::test]
+    async fn start_game_returns_200_with_valid_request() {
+        let state = test_state().await;
+        let app = router().with_state(state);
+
+        let (status, body) = post(app, "/api/v1/game/start", start_body("alice", 1)).await;
+
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(body["phase"], "in_game");
+    }
+
+    #[tokio::test]
+    async fn start_game_returns_409_when_game_already_active() {
+        let state = test_state().await;
+        let app = router().with_state(state);
+
+        let (s1, _) = post(app.clone(), "/api/v1/game/start", start_body("bob", 1)).await;
+        assert_eq!(s1, StatusCode::OK);
+
+        let (s2, body) = post(app, "/api/v1/game/start", start_body("bob", 1)).await;
+        assert_eq!(s2, StatusCode::CONFLICT);
+        assert_eq!(body["error"], "conflict");
+    }
+
+    #[tokio::test]
+    async fn game_state_returns_404_when_no_game() {
+        let state = test_state().await;
+        let app = router().with_state(state);
+
+        let (status, body) = get(app, "/api/v1/game/state").await;
+        assert_eq!(status, StatusCode::NOT_FOUND);
+        assert_eq!(body["error"], "not_found");
+    }
+
+    #[tokio::test]
+    async fn game_state_returns_200_when_game_active() {
+        let state = test_state().await;
+        let app = router().with_state(state);
+
+        let (s, _) = post(app.clone(), "/api/v1/game/start", start_body("carol", 2)).await;
+        assert_eq!(s, StatusCode::OK);
+
+        let (status, body) = get(app, "/api/v1/game/state").await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(body["phase"], "in_game");
+    }
+
+    #[tokio::test]
+    async fn end_game_returns_404_when_no_game() {
+        let state = test_state().await;
+        let app = router().with_state(state);
+
+        let (status, body) = post(app, "/api/v1/game/end", Body::empty()).await;
+        assert_eq!(status, StatusCode::NOT_FOUND);
+        assert_eq!(body["error"], "not_found");
+    }
+
+    #[tokio::test]
+    async fn end_game_returns_200_and_clears_game() {
+        let state = test_state().await;
+        let app = router().with_state(state);
+
+        let (s, _) = post(app.clone(), "/api/v1/game/start", start_body("dave", 1)).await;
+        assert_eq!(s, StatusCode::OK);
+
+        let (s_end, body_end) = post(app.clone(), "/api/v1/game/end", Body::empty()).await;
+        assert_eq!(s_end, StatusCode::OK);
+        assert_eq!(body_end["phase"], "game_over");
+
+        // Engine is cleared — next GET /state must return 404
+        let (s_state, _) = get(app, "/api/v1/game/state").await;
+        assert_eq!(s_state, StatusCode::NOT_FOUND);
+    }
+}
