@@ -3,8 +3,8 @@ WORKDIR /app
 
 FROM chef AS planner
 
-COPY Backend/Cargo.toml Backend/Cargo.lock ./
-COPY Backend/crates ./crates
+COPY Cargo.toml Cargo.lock ./
+COPY crates ./crates
 
 RUN cargo chef prepare --recipe-path recipe.json
 
@@ -24,8 +24,8 @@ COPY --from=planner /app/recipe.json recipe.json
 RUN cargo chef cook --release --recipe-path recipe.json
 
 # Copy the full workspace source and compile the application binary
-COPY Backend/Cargo.toml Backend/Cargo.lock ./
-COPY Backend/crates ./crates
+COPY Cargo.toml Cargo.lock ./
+COPY crates ./crates
 
 ARG CRATE=api
 RUN cargo build --release --bin ${CRATE}

@@ -1,8 +1,8 @@
 services:
   api:
     build:
-      context: ../
-      dockerfile: Backend/Dockerfile
+      context: .
+      dockerfile: Dockerfile
       args:
         CRATE: api
     ports:
@@ -19,8 +19,8 @@ services:
 
   mqtt-bridge:
     build:
-      context: ../
-      dockerfile: Backend/Dockerfile
+      context: .
+      dockerfile: Dockerfile
       args:
         CRATE: mqtt-bridge
     depends_on:
