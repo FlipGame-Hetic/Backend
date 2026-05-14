@@ -40,7 +40,7 @@ impl ApiConfig {
         }
 
         let database_url =
-            std::env::var("DATABASE_URL").unwrap_or_else(|_| "sqlite://flipper.db".to_owned());
+            std::env::var("DATABASE_URL").unwrap_or_else(|_| "sqlite:///data/flipper.db".to_owned());
 
         Ok(Self {
             port,

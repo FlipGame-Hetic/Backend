@@ -45,6 +45,8 @@ RUN sed -i 's|http://deb.debian.org|http://cdn-aws.deb.debian.org|g' /etc/apt/so
 ARG CRATE=api
 COPY --from=builder /app/target/release/${CRATE} /usr/local/bin/app
 
+RUN mkdir -p /data && chown app:app /data
+
 USER app
 
 EXPOSE 8080
