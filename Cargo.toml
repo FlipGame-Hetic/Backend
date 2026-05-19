@@ -24,3 +24,4 @@ futures-util = "0.3"
 schemars = "0.8.22"
 game-logic = { path = "crates/game-logic" }
 sqlx = { version = "0.8", features = ["sqlite", "runtime-tokio", "macros", "migrate"] }
+percent-encoding = "2"

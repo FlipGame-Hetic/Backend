@@ -1,5 +1,6 @@
 use std::net::SocketAddr;
 
+use percent_encoding::{NON_ALPHANUMERIC, percent_encode};
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -39,8 +40,27 @@ impl ApiConfig {
             ));
         }
 
-        let database_url =
-            std::env::var("DATABASE_URL").unwrap_or_else(|_| "sqlite:///data/flipper.db".to_owned());
+        let database_url = if let Ok(url) = std::env::var("DATABASE_URL") {
+            url
+        } else if let Ok(host) = std::env::var("DATABASE_HOST") {
+            let port = std::env::var("DATABASE_PORT").unwrap_or_else(|_| "5432".to_owned());
+            let name = std::env::var("DATABASE_NAME").unwrap_or_else(|_| "flipper".to_owned());
+            let user = std::env::var("DATABASE_USER").unwrap_or_else(|_| "flipper".to_owned());
+            let password = std::env::var("DATABASE_PASSWORD").unwrap_or_default();
+            let user_enc = percent_encode(user.as_bytes(), NON_ALPHANUMERIC).to_string();
+            let password_enc = percent_encode(password.as_bytes(), NON_ALPHANUMERIC).to_string();
+            format!("postgresql://{user_enc}:{password_enc}@{host}:{port}/{name}")
+        } else {
+            if std::env::var("APP_ENV").unwrap_or_default() == "production" {
+                return Err(ConfigError::Invalid(
+                    "DATABASE_URL or DATABASE_HOST must be set in production".to_owned(),
+                ));
+            }
+            tracing::warn!(
+                "No DATABASE_URL or DATABASE_HOST set — falling back to local SQLite (dev only)"
+            );
+            "sqlite:///data/flipper.db".to_owned()
+        };
 
         Ok(Self {
             port,
