@@ -1,6 +1,8 @@
 use api::app;
 use api::config::ApiConfig;
 use sqlx::SqlitePool;
+use sqlx::sqlite::SqliteConnectOptions;
+use std::str::FromStr;
 use tracing::{error, info};
 use tracing_subscriber::{EnvFilter, fmt};
 
@@ -16,7 +18,15 @@ async fn main() {
         }
     };
 
-    let pool = match SqlitePool::connect(&config.database_url).await {
+    let connect_opts = match SqliteConnectOptions::from_str(&config.database_url) {
+        Ok(opts) => opts.create_if_missing(true),
+        Err(e) => {
+            error!(error = %e, url = %config.database_url, "Invalid database URL");
+            std::process::exit(1);
+        }
+    };
+
+    let pool = match SqlitePool::connect_with(connect_opts).await {
         Ok(p) => p,
         Err(e) => {
             error!(error = %e, url = %config.database_url, "Failed to connect to database");
