@@ -5,6 +5,7 @@ services:
       dockerfile: Dockerfile
       args:
         CRATE: api
+    env_file: .env
     ports:
       - "8080:8080"
     volumes:
@@ -25,6 +26,7 @@ services:
       dockerfile: Dockerfile
       args:
         CRATE: mqtt-bridge
+    env_file: .env
     depends_on:
       mosquitto:
         condition: service_healthy
