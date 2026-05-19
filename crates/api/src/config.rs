@@ -31,8 +31,9 @@ impl ApiConfig {
             .filter(|s| !s.is_empty())
             .collect();
 
-        let jwt_secret = std::env::var("SCREEN_JWT_SECRET")
-            .unwrap_or_else(|_| "flipper-dev-secret-change-in-prod".to_owned());
+        let jwt_secret = std::env::var("SCREEN_JWT_SECRET").map_err(|_| {
+            ConfigError::Invalid("SCREEN_JWT_SECRET env var is required".to_owned())
+        })?;
 
         if jwt_secret.len() < 32 {
             return Err(ConfigError::Invalid(
