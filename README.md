@@ -34,7 +34,7 @@ docker compose up -d mosquitto        # Broker only (for MQTT Explorer)
 | API       | 8080 | REST + WS (`/ws/bridge`, `/health`) |
 | Mosquitto | 1883 | MQTT broker (anonymous)             |
 | Nginx     | 80   | Reverse proxy                       |
-| Lucyd   | 8080 | Interactive API docs (`/docs`)     |
+| [Lucyd](https://github.com/Jeck0v/Lucyd)   | 8080 | Interactive API docs (`/docs`)     |
 
 ## Local dev (without Docker)
 
