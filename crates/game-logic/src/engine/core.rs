@@ -131,6 +131,7 @@ impl GameEngine {
                     return envelopes;
                 }
                 self.state.balls_lost_since_start += 1;
+                self.state.bumper_hit_count = 0;
                 self.state.lives = self.state.lives.saturating_sub(1);
 
                 let (pve_env, extra) = self.pve_engine.on_event(&event, &mut self.state);
@@ -198,9 +199,12 @@ impl GameEngine {
                     envelopes.extend(self.process(e));
                 }
 
+                self.state.bumper_hit_count += 1;
+                let bumper_count = self.state.bumper_hit_count;
                 envelopes.extend(self.check_timer_bonus(now));
                 envelopes.push(self.emit_score_delta(scored, "bumper"));
                 envelopes.push(self.emit_score_update());
+                envelopes.extend(self.process(GameEvent::BumperCombo { count: bumper_count }));
             }
 
             GameEvent::BumperCombo { count } => {
@@ -255,7 +259,12 @@ impl GameEngine {
             }
 
             GameEvent::MultiballWin => {
+                self.state.bumper_hit_count = 0;
+                let pts = crate::engine::config::MULTIBALL_SCORE as u64;
+                self.state.add_score(pts);
+                envelopes.push(self.emit_score_delta(pts, "multiball"));
                 envelopes.push(make_event_envelope("MultiballWin", serde_json::Value::Null));
+                envelopes.push(self.emit_score_update());
             }
 
             GameEvent::ScoreMultiplierActivated => {

@@ -10,6 +10,7 @@ pub const PORTAL_SCORE: u32 = 300;
 
 // Multiball
 pub const MULTIBALL_RING_THRESHOLD: u32 = 10;
+pub const MULTIBALL_SCORE: u32 = 5_000;
 
 // Timer bonus (BonusGameTimerMultiplier)
 pub const TIMER_BONUS_SECONDS: u64 = 60;
