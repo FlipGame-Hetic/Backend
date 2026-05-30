@@ -39,6 +39,7 @@ impl TiltState {
 pub struct GameState {
     pub phase: GamePhase,
     pub score: u64,
+    pub player_id: String,
     pub lives: u8,
     pub active_multiplier: f32,
     pub multiplier_expires_at: Option<Instant>,
@@ -58,6 +59,7 @@ impl GameState {
         Self {
             phase: GamePhase::Idle,
             score: 0,
+            player_id: String::new(),
             lives,
             active_multiplier: 1.0,
             multiplier_expires_at: None,

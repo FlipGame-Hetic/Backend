@@ -45,6 +45,7 @@ pub enum GameEvent {
     BumperTriangleHit { pts: u32 },
     BumperCombo { count: u32 },
     PortalUsed,
+    BallSaverReady,
     TiltDetected,
     LifeUp,
     MultiballWin,

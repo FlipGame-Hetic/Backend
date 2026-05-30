@@ -81,6 +81,10 @@ impl GameEngine {
             "BumperTriangle" => GameEvent::BumperTriangleHit {
                 pts: crate::engine::config::BUMPER_TRIANGLE_SCORE,
             },
+            "PortalUsed" => GameEvent::PortalUsed,
+            "FlipperLeft" => GameEvent::ButtonPressed { side: ButtonSide::Left },
+            "FlipperRight" => GameEvent::ButtonPressed { side: ButtonSide::Right },
+            "BallSaverReady" => GameEvent::BallSaverReady,
             unknown => {
                 tracing::debug!(event_type = unknown, "unhandled screen event type");
                 return vec![];
@@ -94,8 +98,9 @@ impl GameEngine {
         let mut envelopes = Vec::new();
 
         match event {
-            GameEvent::StartGame { .. } => {
+            GameEvent::StartGame { ref player_id } => {
                 self.state = GameState::new(DEFAULT_LIVES);
+                self.state.player_id = player_id.clone();
                 self.state.phase = GamePhase::InGame;
                 self.state.session_start = Some(now);
                 self.timer_bonus_given = false;
@@ -194,6 +199,7 @@ impl GameEngine {
                 }
 
                 envelopes.extend(self.check_timer_bonus(now));
+                envelopes.push(self.emit_score_delta(scored, "bumper"));
                 envelopes.push(self.emit_score_update());
             }
 
@@ -206,6 +212,18 @@ impl GameEngine {
             GameEvent::PortalUsed => {
                 let pts = crate::engine::scoring::score_portal_bonus();
                 self.state.add_score(pts);
+                envelopes.push(self.emit_score_delta(pts, "portal"));
+                envelopes.push(self.emit_score_update());
+            }
+
+            GameEvent::BallSaverReady => {
+                if self.state.phase != GamePhase::InGame {
+                    return envelopes;
+                }
+                let pts = crate::engine::config::BALL_SAVER_SCORE as u64;
+                self.state.add_score(pts);
+                envelopes.push(self.emit_score_delta(pts, "ball_saver"));
+                envelopes.push(make_event_envelope("BallSaverReady", serde_json::Value::Null));
                 envelopes.push(self.emit_score_update());
             }
 
@@ -261,6 +279,7 @@ impl GameEngine {
                 self.multiplier.apply(&effect, now);
                 self.state.add_score(effect.bonus_pts as u64);
                 envelopes.push(self.emit_combo_activated(&effect));
+                envelopes.push(self.emit_score_delta(effect.bonus_pts as u64, "combo"));
                 envelopes.push(self.emit_score_update());
             }
 
@@ -298,12 +317,15 @@ impl GameEngine {
             && self.state.balls_lost_since_start == 0
         {
             self.timer_bonus_given = true;
+            let old_score = self.state.score;
             self.state.score = timer_bonus(self.state.score, 0);
+            let delta = self.state.score.saturating_sub(old_score);
             return vec![
                 make_event_envelope(
                     "TimerBonus",
                     serde_json::json!({ "new_score": self.state.score }),
                 ),
+                self.emit_score_delta(delta, "timer_bonus"),
                 self.emit_score_update(),
             ];
         }
@@ -353,11 +375,25 @@ impl GameEngine {
 
     fn emit_score_update(&self) -> ScreenEnvelope {
         let current_multiplier = self.multiplier.current(Instant::now());
+        let ball = self.state.balls_lost_since_start + 1;
         make_event_envelope(
             "ScoreUpdate",
             serde_json::json!({
                 "score": self.state.score,
                 "multiplier": current_multiplier,
+                "player": self.state.player_id,
+                "ball": ball,
+            }),
+        )
+    }
+
+    fn emit_score_delta(&self, delta: u64, reason: &str) -> ScreenEnvelope {
+        make_event_envelope(
+            "ScoreDelta",
+            serde_json::json!({
+                "delta": delta,
+                "reason": reason,
+                "total": self.state.score,
             }),
         )
     }
