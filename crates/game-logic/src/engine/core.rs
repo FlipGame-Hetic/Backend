@@ -82,8 +82,12 @@ impl GameEngine {
                 pts: crate::engine::config::BUMPER_TRIANGLE_SCORE,
             },
             "PortalUsed" => GameEvent::PortalUsed,
-            "FlipperLeft" => GameEvent::ButtonPressed { side: ButtonSide::Left },
-            "FlipperRight" => GameEvent::ButtonPressed { side: ButtonSide::Right },
+            "FlipperLeft" => GameEvent::ButtonPressed {
+                side: ButtonSide::Left,
+            },
+            "FlipperRight" => GameEvent::ButtonPressed {
+                side: ButtonSide::Right,
+            },
             "BallSaverReady" => GameEvent::BallSaverReady,
             unknown => {
                 tracing::debug!(event_type = unknown, "unhandled screen event type");
@@ -208,7 +212,9 @@ impl GameEngine {
                 envelopes.extend(self.check_timer_bonus(now));
                 envelopes.push(self.emit_score_delta(scored, "bumper"));
                 envelopes.push(self.emit_score_update());
-                envelopes.extend(self.process(GameEvent::BumperCombo { count: bumper_count }));
+                envelopes.extend(self.process(GameEvent::BumperCombo {
+                    count: bumper_count,
+                }));
             }
 
             GameEvent::BumperCombo { count } => {
@@ -231,7 +237,10 @@ impl GameEngine {
                 let pts = crate::engine::config::BALL_SAVER_SCORE as u64;
                 self.state.add_score(pts);
                 envelopes.push(self.emit_score_delta(pts, "ball_saver"));
-                envelopes.push(make_event_envelope("BallSaverReady", serde_json::Value::Null));
+                envelopes.push(make_event_envelope(
+                    "BallSaverReady",
+                    serde_json::Value::Null,
+                ));
                 envelopes.push(self.emit_score_update());
             }
 
