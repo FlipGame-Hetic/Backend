@@ -165,7 +165,11 @@ impl GameEngine {
                         envelopes.extend(self.process(GameEvent::ComboActivated(effect)));
                     }
                     ComboResult::Penalty { pts } => {
-                        self.state.score = apply_tilt_penalty(self.state.score, pts);
+                        if pts < 0 {
+                            self.state.score = apply_tilt_penalty(self.state.score, pts);
+                        } else {
+                            self.state.score = self.state.score.saturating_add(pts as u64);
+                        }
                         envelopes.push(self.emit_score_update());
                     }
                     ComboResult::BadgeUnlocked { badge_id } => {

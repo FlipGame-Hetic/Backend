@@ -37,7 +37,7 @@ pub const ENDLESS_LEVEL_SCALE_EXPONENT: f32 = 1.3;
 pub const COMBO_BUFFER_MAX: usize = 10;
 pub const COMBO_DETECTION_WINDOW_MS: u64 = 3_000;
 pub const COMBO_PENALTY_REPEAT: usize = 7;
-pub const COMBO_PENALTY_PTS: i64 = -2_000;
+pub const COMBO_PENALTY_PTS: i64 = 2_000;
 
 // Combo stats: (bonus_pts, multiplier, duration_ms)
 pub const COMBO_1_BONUS: u32 = 0;
