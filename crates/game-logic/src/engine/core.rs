@@ -89,6 +89,7 @@ impl GameEngine {
                 side: ButtonSide::Right,
             },
             "BallSaverReady" => GameEvent::BallSaverReady,
+            "MultiballTriggered" => GameEvent::MultiballTriggered,
             unknown => {
                 tracing::debug!(event_type = unknown, "unhandled screen event type");
                 return vec![];
@@ -135,7 +136,6 @@ impl GameEngine {
                     return envelopes;
                 }
                 self.state.balls_lost_since_start += 1;
-                self.state.bumper_hit_count = 0;
                 self.state.lives = self.state.lives.saturating_sub(1);
 
                 let (pve_env, extra) = self.pve_engine.on_event(&event, &mut self.state);
@@ -207,20 +207,16 @@ impl GameEngine {
                     envelopes.extend(self.process(e));
                 }
 
-                self.state.bumper_hit_count += 1;
-                let bumper_count = self.state.bumper_hit_count;
                 envelopes.extend(self.check_timer_bonus(now));
                 envelopes.push(self.emit_score_delta(scored, "bumper"));
                 envelopes.push(self.emit_score_update());
-                envelopes.extend(self.process(GameEvent::BumperCombo {
-                    count: bumper_count,
-                }));
             }
 
-            GameEvent::BumperCombo { count } => {
-                if count >= crate::engine::config::MULTIBALL_RING_THRESHOLD {
-                    envelopes.extend(self.process(GameEvent::MultiballWin));
+            GameEvent::MultiballTriggered => {
+                if self.state.phase != GamePhase::InGame {
+                    return envelopes;
                 }
+                envelopes.extend(self.process(GameEvent::MultiballWin));
             }
 
             GameEvent::PortalUsed => {
@@ -272,7 +268,6 @@ impl GameEngine {
             }
 
             GameEvent::MultiballWin => {
-                self.state.bumper_hit_count = 0;
                 let pts = crate::engine::config::MULTIBALL_SCORE as u64;
                 self.state.add_score(pts);
                 envelopes.push(self.emit_score_delta(pts, "multiball"));
