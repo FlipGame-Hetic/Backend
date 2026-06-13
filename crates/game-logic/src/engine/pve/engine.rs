@@ -1,4 +1,4 @@
-use shared::screen::{ScreenEnvelope, ScreenId, ScreenTarget};
+use shared::screen::{ScreenEnvelope, ScreenEventType, ScreenId, ScreenTarget};
 
 use crate::engine::config::BOSS_0_HP;
 use crate::engine::events::{GameEvent, GameOverReason};
@@ -84,7 +84,7 @@ impl PveEngine {
             if self.state.endless_level == 1 {
                 self.state.phase = PvePhase::Victory;
                 envelopes.push(make_event_envelope(
-                    "VictoireFinale",
+                    ScreenEventType::VictoireFinale,
                     serde_json::Value::Null,
                 ));
             } else {
@@ -100,7 +100,7 @@ impl PveEngine {
                     self.boss.health.max,
                 ));
                 envelopes.push(make_event_envelope(
-                    "EndlessScaling",
+                    ScreenEventType::EndlessScaling,
                     serde_json::json!({ "level": level }),
                 ));
             }
@@ -152,16 +152,16 @@ impl Default for PveEngine {
 
 fn make_boss_update(boss_id: u8, hp: u32, max_hp: u32) -> ScreenEnvelope {
     make_event_envelope(
-        "BossUpdate",
+        ScreenEventType::BossUpdate,
         serde_json::json!({ "boss_id": boss_id, "boss_hp": hp, "boss_max_hp": max_hp }),
     )
 }
 
-fn make_event_envelope(event_type: &str, payload: serde_json::Value) -> ScreenEnvelope {
+fn make_event_envelope(event_type: ScreenEventType, payload: serde_json::Value) -> ScreenEnvelope {
     ScreenEnvelope {
         from: ScreenId::BackScreen,
         to: ScreenTarget::Broadcast,
-        event_type: event_type.to_owned(),
+        event_type,
         payload,
     }
 }

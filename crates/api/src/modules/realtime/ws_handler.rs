@@ -5,6 +5,7 @@ use futures_util::stream::SplitSink;
 use futures_util::{SinkExt, StreamExt};
 use lucyd::lucy_ws;
 use shared::events::WsMessage;
+use shared::screen::ScreenEventType;
 use tokio::sync::broadcast;
 use tracing::{debug, error, info, warn};
 
@@ -122,14 +123,14 @@ async fn process_inbound(
 
     // Track boss defeats and detect game over
     for env in &envelopes {
-        if env.event_type == "BossDefeated"
+        if env.event_type == ScreenEventType::BossDefeated
             && let Some(session) = session_guard.as_mut()
         {
             session.boss_reached = session.boss_reached.saturating_add(1);
         }
     }
 
-    let game_over = envelopes.iter().any(|e| e.event_type == "GameOver");
+    let game_over = envelopes.iter().any(|e| e.event_type == ScreenEventType::GameOver);
     let score_snapshot = engine.state.score;
     let state_snapshot = engine.state.clone();
 

@@ -1,5 +1,7 @@
 use std::time::{Duration, Instant};
 
+use shared::screen::ScreenEventType;
+
 use crate::engine::config::{
     SKILL_COMBO_MULTIPLIER_DURATION_MS, SKILL_COMBO_MULTIPLIER_FACTOR,
     SKILL_DAMAGE_BOOST_DURATION_MS, SKILL_DAMAGE_BOOST_MULTIPLIER,
@@ -24,7 +26,7 @@ pub enum SkillEffect {
         pts: u32,
     },
     EmitScreenEvent {
-        event_type: String,
+        event_type: ScreenEventType,
         payload: serde_json::Value,
     },
     NoEffect,
@@ -74,7 +76,7 @@ impl BonusSkill {
                 }
             }
             Self::ExtraFlippers => SkillEffect::EmitScreenEvent {
-                event_type: "ExtraFlippers".to_owned(),
+                event_type: ScreenEventType::ExtraFlippers,
                 payload: serde_json::json!({ "duration_ms": SKILL_EXTRA_FLIPPERS_DURATION_MS }),
             },
             Self::ExtraBall => {
@@ -85,11 +87,11 @@ impl BonusSkill {
                 pts: SKILL_PORTAL_BONUS_PTS,
             },
             Self::TimeSlowdown => SkillEffect::EmitScreenEvent {
-                event_type: "TimeSlowdown".to_owned(),
+                event_type: ScreenEventType::TimeSlowdown,
                 payload: serde_json::json!({ "duration_ms": SKILL_TIME_SLOWDOWN_DURATION_MS }),
             },
             Self::Freeze => SkillEffect::EmitScreenEvent {
-                event_type: "Freeze".to_owned(),
+                event_type: ScreenEventType::Freeze,
                 payload: serde_json::json!({ "duration_ms": SKILL_FREEZE_DURATION_MS }),
             },
         }

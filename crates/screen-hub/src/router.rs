@@ -152,13 +152,13 @@ impl ScreenRouter {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use shared::screen::ScreenEnvelope;
+    use shared::screen::{ScreenEnvelope, ScreenEventType};
 
     fn envelope(from: ScreenId, to: ScreenTarget) -> ScreenEnvelope {
         ScreenEnvelope {
             from,
             to,
-            event_type: "test_event".to_owned(),
+            event_type: ScreenEventType::Unknown("test_event".to_owned()),
             payload: serde_json::json!({ "data": "hello" }),
         }
     }
@@ -183,7 +183,8 @@ mod tests {
     struct Mutator;
     impl Interceptor for Mutator {
         fn process(&self, mut envelope: ScreenEnvelope) -> Option<ScreenEnvelope> {
-            envelope.event_type = format!("mutated_{}", envelope.event_type);
+            envelope.event_type =
+                ScreenEventType::Unknown(format!("mutated_{}", envelope.event_type));
             Some(envelope)
         }
     }
@@ -212,7 +213,7 @@ mod tests {
         assert!(!result.intercepted);
 
         let msg = rx.try_recv().unwrap();
-        assert_eq!(msg.event_type, "test_event");
+        assert_eq!(msg.event_type, ScreenEventType::Unknown("test_event".to_owned()));
     }
 
     #[tokio::test]
@@ -310,7 +311,10 @@ mod tests {
         router.dispatch(env).await;
 
         let msg = rx.try_recv().unwrap();
-        assert_eq!(msg.event_type, "mutated_test_event");
+        assert_eq!(
+            msg.event_type,
+            ScreenEventType::Unknown("mutated_test_event".to_owned())
+        );
     }
 
     #[tokio::test]
@@ -336,7 +340,10 @@ mod tests {
         router.dispatch(env).await;
 
         let msg = rx.try_recv().unwrap();
-        assert_eq!(msg.event_type, "mutated_test_event");
+        assert_eq!(
+            msg.event_type,
+            ScreenEventType::Unknown("mutated_test_event".to_owned())
+        );
     }
 
     #[tokio::test]

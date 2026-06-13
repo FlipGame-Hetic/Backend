@@ -5,7 +5,7 @@ use futures_util::{SinkExt, StreamExt};
 use game_logic::GameEngine;
 use lucyd::lucy_ws;
 use serde::Deserialize;
-use shared::screen::{ScreenEnvelope, ScreenId};
+use shared::screen::{ScreenEnvelope, ScreenEventType, ScreenId};
 use tracing::{debug, error, info, warn};
 
 use crate::errors::ApiError;
@@ -141,7 +141,7 @@ async fn read_loop(
 }
 
 async fn process_screen_event(state: &AppState, envelope: &ScreenEnvelope) {
-    if envelope.event_type == "StartGame" {
+    if envelope.event_type == ScreenEventType::StartGame {
         handle_start_game(state, envelope).await;
     } else {
         handle_game_event(state, envelope).await;
@@ -219,14 +219,14 @@ async fn handle_game_event(state: &AppState, envelope: &ScreenEnvelope) {
     let envelopes = engine.handle_screen_event(envelope);
 
     for env in &envelopes {
-        if env.event_type == "BossDefeated"
+        if env.event_type == ScreenEventType::BossDefeated
             && let Some(session) = session_guard.as_mut()
         {
             session.boss_reached = session.boss_reached.saturating_add(1);
         }
     }
 
-    let game_over = envelopes.iter().any(|e| e.event_type == "GameOver");
+    let game_over = envelopes.iter().any(|e| e.event_type == ScreenEventType::GameOver);
     let score_snapshot = engine.state.score;
     let state_snapshot = engine.state.clone();
 

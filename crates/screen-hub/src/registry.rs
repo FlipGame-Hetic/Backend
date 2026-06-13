@@ -176,13 +176,13 @@ impl ScreenRegistry {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use shared::screen::ScreenTarget;
+    use shared::screen::{ScreenEventType, ScreenTarget};
 
     fn test_envelope(from: ScreenId, to: ScreenTarget) -> ScreenEnvelope {
         ScreenEnvelope {
             from,
             to,
-            event_type: "test".to_owned(),
+            event_type: ScreenEventType::Unknown("test".to_owned()),
             payload: serde_json::json!({ "v": 1 }),
         }
     }
@@ -207,7 +207,7 @@ mod tests {
         assert!(sent);
 
         let received = rx.try_recv().unwrap();
-        assert_eq!(received.event_type, "test");
+        assert_eq!(received.event_type, ScreenEventType::Unknown("test".to_owned()));
     }
 
     #[tokio::test]

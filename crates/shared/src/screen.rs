@@ -2,7 +2,7 @@ use std::fmt;
 use std::str::FromStr;
 
 use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use utoipa::ToSchema;
 
 /// Fixed set of known frontend screens.
@@ -69,17 +69,192 @@ pub enum ScreenTarget {
     Broadcast,
 }
 
-/// Envelope for messages transiting between frontend screens via the backend.
+/// Typed set of events that transit over the screen WebSocket channel.
 ///
-/// The `event_type` field is a free-form string that identifies the kind of event
-/// (e.g. "game_state_update", "score_change"). The `payload` is intentionally
-/// kept as `serde_json::Value` to stay flexible — strong typing will be layered
-/// on top when the processing pipeline is implemented.
+/// All events produced by the game engine or sent by frontend screens are
+/// members of this enum. The `Unknown` variant acts as a catch-all so that
+/// unknown wire values deserialise gracefully instead of failing.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ScreenEventType {
+    // Inbound: sent by a screen to the game engine
+    StartGame,
+    EndGame,
+    BallLost,
+    BallSaved,
+    LifeUp,
+    UltimateActivated,
+    Bumper,
+    BumperTriangle,
+    PortalUsed,
+    FlipperLeft,
+    FlipperRight,
+    BallSaverReady,
+    MultiballTriggered,
+    // Outbound: emitted by the game engine to screens
+    BossDefeated,
+    GameOver,
+    ScoreUpdate,
+    ScoreDelta,
+    LifeUpdate,
+    ComboActivated,
+    BadgeUnlocked,
+    MultiballWin,
+    MultiplierUpdate,
+    TiltPenalty,
+    CheatingDetected,
+    TimerBonus,
+    BossUpdate,
+    VictoireFinale,
+    EndlessScaling,
+    ExtraBall,
+    ShieldActivated,
+    ExtraFlippers,
+    TimeSlowdown,
+    Freeze,
+    MalusInvisible,
+    MalusInkBlot,
+    MalusBumperReduction,
+    MalusBlackHole,
+    MalusModifyBounce,
+    MalusStickyBumpers,
+    /// Extension / test events that are not part of the known protocol.
+    Unknown(String),
+}
+
+impl ScreenEventType {
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::StartGame => "StartGame",
+            Self::EndGame => "EndGame",
+            Self::BallLost => "BallLost",
+            Self::BallSaved => "BallSaved",
+            Self::LifeUp => "LifeUp",
+            Self::UltimateActivated => "UltimateActivated",
+            Self::Bumper => "Bumper",
+            Self::BumperTriangle => "BumperTriangle",
+            Self::PortalUsed => "PortalUsed",
+            Self::FlipperLeft => "FlipperLeft",
+            Self::FlipperRight => "FlipperRight",
+            Self::BallSaverReady => "BallSaverReady",
+            Self::MultiballTriggered => "MultiballTriggered",
+            Self::BossDefeated => "BossDefeated",
+            Self::GameOver => "GameOver",
+            Self::ScoreUpdate => "ScoreUpdate",
+            Self::ScoreDelta => "ScoreDelta",
+            Self::LifeUpdate => "LifeUpdate",
+            Self::ComboActivated => "ComboActivated",
+            Self::BadgeUnlocked => "BadgeUnlocked",
+            Self::MultiballWin => "MultiballWin",
+            Self::MultiplierUpdate => "MultiplierUpdate",
+            Self::TiltPenalty => "TiltPenalty",
+            Self::CheatingDetected => "CheatingDetected",
+            Self::TimerBonus => "TimerBonus",
+            Self::BossUpdate => "BossUpdate",
+            Self::VictoireFinale => "VictoireFinale",
+            Self::EndlessScaling => "EndlessScaling",
+            Self::ExtraBall => "ExtraBall",
+            Self::ShieldActivated => "ShieldActivated",
+            Self::ExtraFlippers => "ExtraFlippers",
+            Self::TimeSlowdown => "TimeSlowdown",
+            Self::Freeze => "Freeze",
+            Self::MalusInvisible => "MalusInvisible",
+            Self::MalusInkBlot => "MalusInkBlot",
+            Self::MalusBumperReduction => "MalusBumperReduction",
+            Self::MalusBlackHole => "MalusBlackHole",
+            Self::MalusModifyBounce => "MalusModifyBounce",
+            Self::MalusStickyBumpers => "MalusStickyBumpers",
+            Self::Unknown(s) => s.as_str(),
+        }
+    }
+}
+
+impl fmt::Display for ScreenEventType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+impl From<String> for ScreenEventType {
+    fn from(s: String) -> Self {
+        match s.as_str() {
+            "StartGame" => Self::StartGame,
+            "EndGame" => Self::EndGame,
+            "BallLost" => Self::BallLost,
+            "BallSaved" => Self::BallSaved,
+            "LifeUp" => Self::LifeUp,
+            "UltimateActivated" => Self::UltimateActivated,
+            "Bumper" => Self::Bumper,
+            "BumperTriangle" => Self::BumperTriangle,
+            "PortalUsed" => Self::PortalUsed,
+            "FlipperLeft" => Self::FlipperLeft,
+            "FlipperRight" => Self::FlipperRight,
+            "BallSaverReady" => Self::BallSaverReady,
+            "MultiballTriggered" => Self::MultiballTriggered,
+            "BossDefeated" => Self::BossDefeated,
+            "GameOver" => Self::GameOver,
+            "ScoreUpdate" => Self::ScoreUpdate,
+            "ScoreDelta" => Self::ScoreDelta,
+            "LifeUpdate" => Self::LifeUpdate,
+            "ComboActivated" => Self::ComboActivated,
+            "BadgeUnlocked" => Self::BadgeUnlocked,
+            "MultiballWin" => Self::MultiballWin,
+            "MultiplierUpdate" => Self::MultiplierUpdate,
+            "TiltPenalty" => Self::TiltPenalty,
+            "CheatingDetected" => Self::CheatingDetected,
+            "TimerBonus" => Self::TimerBonus,
+            "BossUpdate" => Self::BossUpdate,
+            "VictoireFinale" => Self::VictoireFinale,
+            "EndlessScaling" => Self::EndlessScaling,
+            "ExtraBall" => Self::ExtraBall,
+            "ShieldActivated" => Self::ShieldActivated,
+            "ExtraFlippers" => Self::ExtraFlippers,
+            "TimeSlowdown" => Self::TimeSlowdown,
+            "Freeze" => Self::Freeze,
+            "MalusInvisible" => Self::MalusInvisible,
+            "MalusInkBlot" => Self::MalusInkBlot,
+            "MalusBumperReduction" => Self::MalusBumperReduction,
+            "MalusBlackHole" => Self::MalusBlackHole,
+            "MalusModifyBounce" => Self::MalusModifyBounce,
+            "MalusStickyBumpers" => Self::MalusStickyBumpers,
+            _ => Self::Unknown(s),
+        }
+    }
+}
+
+impl Serialize for ScreenEventType {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.serialize_str(self.as_str())
+    }
+}
+
+impl<'de> Deserialize<'de> for ScreenEventType {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let s = String::deserialize(deserializer)?;
+        Ok(Self::from(s))
+    }
+}
+
+impl schemars::JsonSchema for ScreenEventType {
+    fn schema_name() -> String {
+        "ScreenEventType".to_owned()
+    }
+
+    fn json_schema(_gen: &mut schemars::r#gen::SchemaGenerator) -> schemars::schema::Schema {
+        schemars::schema::SchemaObject {
+            instance_type: Some(schemars::schema::InstanceType::String.into()),
+            ..Default::default()
+        }
+        .into()
+    }
+}
+
+/// Envelope for messages transiting between frontend screens via the backend.
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema, JsonSchema)]
 pub struct ScreenEnvelope {
     pub from: ScreenId,
     pub to: ScreenTarget,
-    pub event_type: String,
+    #[schema(value_type = String)]
+    pub event_type: ScreenEventType,
     pub payload: serde_json::Value,
 }
 
@@ -148,13 +323,31 @@ mod tests {
     }
 
     #[test]
+    fn screen_event_type_known_roundtrip() {
+        let evt = ScreenEventType::BossDefeated;
+        let json = serde_json::to_string(&evt).unwrap();
+        assert_eq!(json, r#""BossDefeated""#);
+        let parsed: ScreenEventType = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed, evt);
+    }
+
+    #[test]
+    fn screen_event_type_unknown_roundtrip() {
+        let evt = ScreenEventType::Unknown("custom_event".to_owned());
+        let json = serde_json::to_string(&evt).unwrap();
+        assert_eq!(json, r#""custom_event""#);
+        let parsed: ScreenEventType = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed, evt);
+    }
+
+    #[test]
     fn screen_envelope_serde_roundtrip() {
         let envelope = ScreenEnvelope {
             from: ScreenId::FrontScreen,
             to: ScreenTarget::Screen {
                 id: ScreenId::BackScreen,
             },
-            event_type: "game_state_update".to_owned(),
+            event_type: ScreenEventType::ScoreUpdate,
             payload: serde_json::json!({ "score": 42 }),
         };
 
@@ -172,7 +365,7 @@ mod tests {
         let envelope = ScreenEnvelope {
             from: ScreenId::DmdScreen,
             to: ScreenTarget::Broadcast,
-            event_type: "ping".to_owned(),
+            event_type: ScreenEventType::Unknown("ping".to_owned()),
             payload: serde_json::Value::Null,
         };
 

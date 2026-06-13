@@ -1,7 +1,7 @@
 use std::time::Instant;
 
 use shared::events::InboundMessage;
-use shared::screen::{ScreenEnvelope, ScreenId, ScreenTarget};
+use shared::screen::{ScreenEnvelope, ScreenEventType, ScreenId, ScreenTarget};
 
 use crate::combo::{ComboDetector, ComboResult, MultiplierState};
 use crate::engine::config::{DEFAULT_LIVES, ULTIME_CHARGE_RATIO};
@@ -52,8 +52,8 @@ impl GameEngine {
     }
 
     pub fn handle_screen_event(&mut self, envelope: &ScreenEnvelope) -> Vec<ScreenEnvelope> {
-        let event = match envelope.event_type.as_str() {
-            "StartGame" => {
+        let event = match &envelope.event_type {
+            ScreenEventType::StartGame => {
                 let player_id = envelope
                     .payload
                     .get("player_id")
@@ -62,11 +62,11 @@ impl GameEngine {
                     .to_owned();
                 GameEvent::StartGame { player_id }
             }
-            "EndGame" => GameEvent::EndGame,
-            "BallLost" => GameEvent::BallLost,
-            "BallSaved" => GameEvent::BallSaved,
-            "LifeUp" => GameEvent::LifeUp,
-            "UltimateActivated" => {
+            ScreenEventType::EndGame => GameEvent::EndGame,
+            ScreenEventType::BallLost => GameEvent::BallLost,
+            ScreenEventType::BallSaved => GameEvent::BallSaved,
+            ScreenEventType::LifeUp => GameEvent::LifeUp,
+            ScreenEventType::UltimateActivated => {
                 let player_id = envelope
                     .payload
                     .get("player_id")
@@ -75,23 +75,23 @@ impl GameEngine {
                     .to_owned();
                 GameEvent::UltimateActivated { player_id }
             }
-            "Bumper" => GameEvent::BumperHit {
+            ScreenEventType::Bumper => GameEvent::BumperHit {
                 pts: crate::engine::config::BUMPER_SCORE,
             },
-            "BumperTriangle" => GameEvent::BumperTriangleHit {
+            ScreenEventType::BumperTriangle => GameEvent::BumperTriangleHit {
                 pts: crate::engine::config::BUMPER_TRIANGLE_SCORE,
             },
-            "PortalUsed" => GameEvent::PortalUsed,
-            "FlipperLeft" => GameEvent::ButtonPressed {
+            ScreenEventType::PortalUsed => GameEvent::PortalUsed,
+            ScreenEventType::FlipperLeft => GameEvent::ButtonPressed {
                 side: ButtonSide::Left,
             },
-            "FlipperRight" => GameEvent::ButtonPressed {
+            ScreenEventType::FlipperRight => GameEvent::ButtonPressed {
                 side: ButtonSide::Right,
             },
-            "BallSaverReady" => GameEvent::BallSaverReady,
-            "MultiballTriggered" => GameEvent::MultiballTriggered,
-            unknown => {
-                tracing::debug!(event_type = unknown, "unhandled screen event type");
+            ScreenEventType::BallSaverReady => GameEvent::BallSaverReady,
+            ScreenEventType::MultiballTriggered => GameEvent::MultiballTriggered,
+            other => {
+                tracing::debug!(event_type = %other, "unhandled screen event type");
                 return vec![];
             }
         };
@@ -178,7 +178,7 @@ impl GameEngine {
                     }
                     ComboResult::BadgeUnlocked { badge_id } => {
                         envelopes.push(make_event_envelope(
-                            "BadgeUnlocked",
+                            ScreenEventType::BadgeUnlocked,
                             serde_json::json!({ "badge_id": badge_id }),
                         ));
                     }
@@ -234,7 +234,7 @@ impl GameEngine {
                 self.state.add_score(pts);
                 envelopes.push(self.emit_score_delta(pts, "ball_saver"));
                 envelopes.push(make_event_envelope(
-                    "BallSaverReady",
+                    ScreenEventType::BallSaverReady,
                     serde_json::Value::Null,
                 ));
                 envelopes.push(self.emit_score_update());
@@ -247,7 +247,7 @@ impl GameEngine {
                         self.state.score = apply_tilt_penalty(self.state.score, pts);
                         envelopes.push(self.emit_score_update());
                         envelopes.push(make_event_envelope(
-                            "TiltPenalty",
+                            ScreenEventType::TiltPenalty,
                             serde_json::json!({ "penalty": pts }),
                         ));
                     }
@@ -255,7 +255,7 @@ impl GameEngine {
                         self.state.cheating_detected = true;
                         tracing::warn!("cheating detected — score locked");
                         envelopes.push(make_event_envelope(
-                            "CheatingDetected",
+                            ScreenEventType::CheatingDetected,
                             serde_json::Value::Null,
                         ));
                     }
@@ -271,14 +271,14 @@ impl GameEngine {
                 let pts = crate::engine::config::MULTIBALL_SCORE as u64;
                 self.state.add_score(pts);
                 envelopes.push(self.emit_score_delta(pts, "multiball"));
-                envelopes.push(make_event_envelope("MultiballWin", serde_json::Value::Null));
+                envelopes.push(make_event_envelope(ScreenEventType::MultiballWin, serde_json::Value::Null));
                 envelopes.push(self.emit_score_update());
             }
 
             GameEvent::ScoreMultiplierActivated => {
                 let current_multiplier = self.multiplier.current(now);
                 envelopes.push(make_event_envelope(
-                    "MultiplierUpdate",
+                    ScreenEventType::MultiplierUpdate,
                     serde_json::json!({ "multiplier": current_multiplier }),
                 ));
             }
@@ -303,7 +303,7 @@ impl GameEngine {
             GameEvent::BossDefeated { boss_id } => {
                 tracing::info!(boss_id, "boss defeated event processed");
                 envelopes.push(make_event_envelope(
-                    "BossDefeated",
+                    ScreenEventType::BossDefeated,
                     serde_json::json!({ "boss_id": boss_id }),
                 ));
             }
@@ -339,7 +339,7 @@ impl GameEngine {
             let delta = self.state.score.saturating_sub(old_score);
             return vec![
                 make_event_envelope(
-                    "TimerBonus",
+                    ScreenEventType::TimerBonus,
                     serde_json::json!({ "new_score": self.state.score }),
                 ),
                 self.emit_score_delta(delta, "timer_bonus"),
@@ -364,16 +364,16 @@ impl GameEngine {
                 };
                 self.multiplier.apply(&combo_effect, now);
                 vec![make_event_envelope(
-                    "MultiplierUpdate",
+                    ScreenEventType::MultiplierUpdate,
                     serde_json::json!({ "multiplier": factor, "duration_ms": duration_ms }),
                 )]
             }
             SkillEffect::AddBalls { count } => vec![make_event_envelope(
-                "ExtraBall",
+                ScreenEventType::ExtraBall,
                 serde_json::json!({ "count": count }),
             )],
             SkillEffect::ShieldActivated { duration_ms } => vec![make_event_envelope(
-                "ShieldActivated",
+                ScreenEventType::ShieldActivated,
                 serde_json::json!({ "duration_ms": duration_ms }),
             )],
             SkillEffect::AddScore { pts } => {
@@ -384,7 +384,7 @@ impl GameEngine {
                 event_type,
                 payload,
             } => {
-                vec![make_event_envelope(&event_type, payload)]
+                vec![make_event_envelope(event_type, payload)]
             }
             SkillEffect::NoEffect => vec![],
         }
@@ -394,7 +394,7 @@ impl GameEngine {
         let current_multiplier = self.multiplier.current(Instant::now());
         let ball = self.state.balls_lost_since_start + 1;
         make_event_envelope(
-            "ScoreUpdate",
+            ScreenEventType::ScoreUpdate,
             serde_json::json!({
                 "score": self.state.score,
                 "multiplier": current_multiplier,
@@ -406,7 +406,7 @@ impl GameEngine {
 
     fn emit_score_delta(&self, delta: u64, reason: &str) -> ScreenEnvelope {
         make_event_envelope(
-            "ScoreDelta",
+            ScreenEventType::ScoreDelta,
             serde_json::json!({
                 "delta": delta,
                 "reason": reason,
@@ -417,14 +417,14 @@ impl GameEngine {
 
     fn emit_life_update(&self) -> ScreenEnvelope {
         make_event_envelope(
-            "LifeUpdate",
+            ScreenEventType::LifeUpdate,
             serde_json::json!({ "lives_remaining": self.state.lives }),
         )
     }
 
     fn emit_combo_activated(&self, effect: &crate::combo::ComboEffect) -> ScreenEnvelope {
         make_event_envelope(
-            "ComboActivated",
+            ScreenEventType::ComboActivated,
             serde_json::json!({
                 "combo_id": effect.combo_id,
                 "bonus_pts": effect.bonus_pts,
@@ -436,17 +436,17 @@ impl GameEngine {
 
     fn emit_game_over(&self) -> ScreenEnvelope {
         make_event_envelope(
-            "GameOver",
+            ScreenEventType::GameOver,
             serde_json::json!({ "final_score": self.state.score }),
         )
     }
 }
 
-fn make_event_envelope(event_type: &str, payload: serde_json::Value) -> ScreenEnvelope {
+fn make_event_envelope(event_type: ScreenEventType, payload: serde_json::Value) -> ScreenEnvelope {
     ScreenEnvelope {
         from: ScreenId::BackScreen,
         to: ScreenTarget::Broadcast,
-        event_type: event_type.to_owned(),
+        event_type,
         payload,
     }
 }
