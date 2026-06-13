@@ -5,15 +5,11 @@ use futures_util::stream::SplitSink;
 use futures_util::{SinkExt, StreamExt};
 use lucyd::lucy_ws;
 use shared::events::WsMessage;
-use shared::screen::ScreenEventType;
 use tokio::sync::broadcast;
 use tracing::{debug, error, info, warn};
 
-use crate::modules::scores::dto::SaveScoreRequest;
-use crate::modules::scores::service as score_service;
+use crate::modules::game::service::GameService;
 use crate::state::AppState;
-
-use super::bridge_sync::sync_game_state_to_bridge;
 
 /// Axum handler: upgrade HTTP to WebSocket for a bridge connection.
 #[lucy_ws(
@@ -97,7 +93,7 @@ async fn read_loop(mut stream: futures_util::stream::SplitStream<WebSocket>, sta
                     *id_guard = Some(device_id.clone());
                 }
 
-                process_inbound(&state, device_id.clone(), payload).await;
+                process_inbound(&state, payload).await;
             }
             WsMessage::Outbound { .. } => {
                 warn!("received outbound message from bridge (unexpected direction), ignoring");
@@ -106,61 +102,9 @@ async fn read_loop(mut stream: futures_util::stream::SplitStream<WebSocket>, sta
     }
 }
 
-async fn process_inbound(
-    state: &AppState,
-    device_id: String,
-    payload: &shared::events::InboundMessage,
-) {
-    // Lock order: engine FIRST, session SECOND [§ 4.4]
-    let mut engine_guard = state.game_engine.lock().await;
-    let mut session_guard = state.active_session.lock().await;
-
-    let Some(engine) = engine_guard.as_mut() else {
-        return;
-    };
-
-    let envelopes = engine.handle_inbound(payload);
-
-    // Track boss defeats and detect game over
-    for env in &envelopes {
-        if env.event_type == ScreenEventType::BossDefeated
-            && let Some(session) = session_guard.as_mut()
-        {
-            session.boss_reached = session.boss_reached.saturating_add(1);
-        }
-    }
-
-    let game_over = envelopes.iter().any(|e| e.event_type == ScreenEventType::GameOver);
-    let score_snapshot = engine.state.score;
-    let state_snapshot = engine.state.clone();
-
-    let session_snapshot = if game_over {
-        *engine_guard = None;
-        session_guard.take()
-    } else {
-        None
-    };
-
-    // Unlock before any await [§ 4.4]
-    drop(session_guard);
-    drop(engine_guard);
-
-    for env in envelopes {
-        let _ = state.screen_router.dispatch(env).await;
-    }
-
-    sync_game_state_to_bridge(&state_snapshot, &state.hub, &device_id);
-
-    if game_over && let Some(session) = session_snapshot {
-        let req = SaveScoreRequest {
-            player_id: session.player_id,
-            character_id: session.character_id,
-            score: score_snapshot,
-            boss_reached: session.boss_reached,
-        };
-        if let Err(e) = score_service::save_score(&state.db_pool, req).await {
-            error!(error = %e, "failed to persist score after game over");
-        }
+async fn process_inbound(state: &AppState, payload: &shared::events::InboundMessage) {
+    if let Err(e) = GameService::new(state).process_inbound(payload).await {
+        error!(error = ?e, "game service error processing inbound");
     }
 }
 
