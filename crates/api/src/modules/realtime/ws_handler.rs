@@ -104,7 +104,7 @@ async fn read_loop(mut stream: futures_util::stream::SplitStream<WebSocket>, sta
 
 async fn process_inbound(state: &AppState, payload: &shared::events::InboundMessage) {
     if let Err(e) = GameService::new(state).process_inbound(payload).await {
-        error!(error = ?e, "game service error processing inbound");
+        error!(error = %e, "game service error processing inbound");
     }
 }
 

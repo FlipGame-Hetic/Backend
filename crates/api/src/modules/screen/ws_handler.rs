@@ -157,11 +157,11 @@ async fn process_screen_event(state: &AppState, envelope: &ScreenEnvelope) {
                 warn!("StartGame ignored — game already in progress");
             }
             Err(e) => {
-                error!(error = ?e, "game service error starting game from screen");
+                error!(error = %e, "game service error starting game from screen");
             }
         }
     } else if let Err(e) = GameService::new(state).process_screen_event(envelope).await {
-        error!(error = ?e, "game service error processing screen event");
+        error!(error = %e, "game service error processing screen event");
     }
 }
 

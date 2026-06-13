@@ -1,6 +1,7 @@
 use game_logic::GameEngine;
 use shared::events::InboundMessage;
 use shared::screen::{ScreenEnvelope, ScreenEventType};
+use thiserror::Error;
 use tracing::warn;
 
 use crate::errors::ApiError;
@@ -9,10 +10,13 @@ use crate::modules::scores::dto::SaveScoreRequest;
 use crate::modules::scores::service as score_service;
 use crate::state::{AppState, GameSession};
 
-#[derive(Debug)]
+#[derive(Debug, Error)]
 pub enum GameServiceError {
+    #[error("a game is already in progress")]
     AlreadyInProgress,
+    #[error("no game is in progress")]
     NotInProgress,
+    #[error("score persistence failed: {0}")]
     Score(ApiError),
 }
 
@@ -34,10 +38,14 @@ pub struct GameService<'a> {
     state: &'a AppState,
 }
 
+/// Results extracted from the engine while both mutex guards are held.
+///
+/// `session_snapshot` is `Some` exclusively when `game_over` is true — it carries
+/// the session data needed to persist the final score. If it is `None` on a game-over
+/// path, the engine existed without a corresponding session (corrupt state).
 struct EngineResult {
     envelopes: Vec<ScreenEnvelope>,
     state_snapshot: game_logic::GameState,
-    score_snapshot: u64,
     session_snapshot: Option<GameSession>,
     game_over: bool,
 }
@@ -70,7 +78,6 @@ impl<'a> GameService<'a> {
         }
 
         let game_over = envelopes.iter().any(|e| e.event_type == ScreenEventType::GameOver);
-        let score_snapshot = engine.state.score;
         let state_snapshot = engine.state.clone();
 
         let session_snapshot = if game_over {
@@ -83,7 +90,6 @@ impl<'a> GameService<'a> {
         Some(EngineResult {
             envelopes,
             state_snapshot,
-            score_snapshot,
             session_snapshot,
             game_over,
         })
@@ -103,16 +109,21 @@ impl<'a> GameService<'a> {
         }
 
         if result.game_over {
-            if let Some(session) = result.session_snapshot {
-                let req = SaveScoreRequest {
-                    player_id: session.player_id,
-                    character_id: session.character_id,
-                    score: result.score_snapshot,
-                    boss_reached: session.boss_reached,
-                };
-                score_service::save_score(&self.state.db_pool, req)
-                    .await
-                    .map_err(|e| GameServiceError::Score(e.into()))?;
+            match result.session_snapshot {
+                Some(session) => {
+                    let req = SaveScoreRequest {
+                        player_id: session.player_id,
+                        character_id: session.character_id,
+                        score: result.state_snapshot.score,
+                        boss_reached: session.boss_reached,
+                    };
+                    score_service::save_score(&self.state.db_pool, req)
+                        .await
+                        .map_err(|e| GameServiceError::Score(e.into()))?;
+                }
+                None => {
+                    warn!("game over fired but session was already cleared — score not persisted");
+                }
             }
         }
 
@@ -174,12 +185,14 @@ impl<'a> GameService<'a> {
         let mut engine_guard = self.state.game_engine.lock().await;
         let mut session_guard = self.state.active_session.lock().await;
 
+        // The engine is the authoritative "in-progress" signal for end(): it is cleared
+        // atomically inside this lock scope, so a concurrent second call to end() will
+        // correctly get NotInProgress even while the first call is still awaiting save_score.
         let Some(engine) = engine_guard.as_mut() else {
             return Err(GameServiceError::NotInProgress);
         };
 
         let envelopes = engine.process(game_logic::GameEvent::EndGame);
-        let score_snapshot = engine.state.score;
         let state_snapshot = engine.state.clone();
         let session_snapshot = session_guard.take();
 
@@ -197,7 +210,7 @@ impl<'a> GameService<'a> {
             let req = SaveScoreRequest {
                 player_id: session.player_id,
                 character_id: session.character_id,
-                score: score_snapshot,
+                score: state_snapshot.score,
                 boss_reached: session.boss_reached,
             };
             score_service::save_score(&self.state.db_pool, req)
