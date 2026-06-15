@@ -35,14 +35,22 @@ impl From<ButtonSide> for ButtonPress {
 
 #[derive(Debug, Clone)]
 pub enum GameEvent {
-    StartGame { player_id: String },
+    StartGame {
+        player_id: String,
+    },
     EndGame,
     BallLaunched,
     BallLost,
     BallSaved,
-    ButtonPressed { side: ButtonSide },
-    BumperHit { pts: u32 },
-    BumperTriangleHit { pts: u32 },
+    ButtonPressed {
+        side: ButtonSide,
+    },
+    BumperHit {
+        pts: u32,
+    },
+    BumperTriangleHit {
+        pts: u32,
+    },
     PortalUsed,
     BallSaverReady,
     TiltDetected,
@@ -50,14 +58,26 @@ pub enum GameEvent {
     MultiballTriggered,
     MultiballWin,
     ScoreMultiplierActivated,
-    UltimateActivated { player_id: String },
+    UltimateActivated {
+        player_id: String,
+    },
     ComboActivated(crate::combo::ComboEffect),
-    BossDefeated { boss_id: u8 },
-    GameOverTriggered { reason: GameOverReason },
+    BossDefeated {
+        boss_id: u8,
+    },
+    GameOverTriggered {
+        reason: GameOverReason,
+    },
     TimerBonusCheck,
     /// Internal tick emitted by the API-layer rail ticker task.
     /// `fib_step` drives the Fibonacci score progression.
-    RailTick { ball_id: Option<u8>, fib_step: u32 },
+    RailTick {
+        ball_id: Option<u8>,
+        fib_step: u32,
+    },
     /// Internal tick emitted by the API-layer ramp ticker task.
-    RampTick { ball_id: Option<u8>, fib_step: u32 },
+    RampTick {
+        ball_id: Option<u8>,
+        fib_step: u32,
+    },
 }

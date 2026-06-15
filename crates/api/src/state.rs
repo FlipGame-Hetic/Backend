@@ -36,8 +36,7 @@ pub struct AppState {
     pub active_device_id: Arc<tokio::sync::RwLock<Option<String>>>,
     pub db_pool: sqlx::SqlitePool,
     /// Active rail/ramp ticker sessions. Dropping a sender cancels the associated task.
-    pub active_rail_sessions:
-        Arc<Mutex<HashMap<RailSessionKey, tokio::sync::oneshot::Sender<()>>>>,
+    pub active_rail_sessions: Arc<Mutex<HashMap<RailSessionKey, tokio::sync::oneshot::Sender<()>>>>,
 }
 
 impl AppState {

@@ -34,7 +34,10 @@ pub async fn start_game(
         .start(body.player_id, body.character_id)
         .await?;
 
-    Ok((StatusCode::OK, axum::Json(GameStateResponse::from(snapshot))))
+    Ok((
+        StatusCode::OK,
+        axum::Json(GameStateResponse::from(snapshot)),
+    ))
 }
 
 #[lucy_http(
@@ -72,7 +75,10 @@ pub async fn game_state(State(state): State<AppState>) -> Result<impl IntoRespon
 pub async fn end_game(State(state): State<AppState>) -> Result<impl IntoResponse, ApiError> {
     let snapshot = GameService::new(&state).end().await?;
 
-    Ok((StatusCode::OK, axum::Json(GameStateResponse::from(snapshot))))
+    Ok((
+        StatusCode::OK,
+        axum::Json(GameStateResponse::from(snapshot)),
+    ))
 }
 
 #[cfg(test)]

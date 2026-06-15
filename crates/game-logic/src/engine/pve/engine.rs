@@ -73,7 +73,7 @@ impl PveEngine {
     fn transition_after_defeat(
         &mut self,
         envelopes: &mut Vec<ScreenEnvelope>,
-        _extra_events: &mut Vec<GameEvent>,
+        _extra_events: &mut [GameEvent],
     ) {
         let next_index = self.state.current_boss_index + 1;
 

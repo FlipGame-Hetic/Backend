@@ -29,7 +29,7 @@ async fn handle_bridge(socket: WebSocket, state: AppState) {
     let hub_rx = state.hub.subscribe();
 
     let write_handle = tokio::spawn(write_loop(sink, hub_rx));
-    let read_handle = tokio::spawn(read_loop(stream, state));
+    let read_handle = tokio::spawn(read_loop(stream, state.clone()));
 
     tokio::select! {
         res = read_handle => {

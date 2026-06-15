@@ -213,7 +213,10 @@ mod tests {
         assert!(!result.intercepted);
 
         let msg = rx.try_recv().unwrap();
-        assert_eq!(msg.event_type, ScreenEventType::Unknown("test_event".to_owned()));
+        assert_eq!(
+            msg.event_type,
+            ScreenEventType::Unknown("test_event".to_owned())
+        );
     }
 
     #[tokio::test]

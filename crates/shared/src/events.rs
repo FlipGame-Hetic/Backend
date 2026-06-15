@@ -167,7 +167,10 @@ mod tests {
         assert_eq!(json, expected_json, "serialized JSON mismatch");
 
         // Both internally-tagged discriminants must be present in the wire form.
-        assert!(json.contains(r#""dir":"#), "missing `dir` discriminant: {json}");
+        assert!(
+            json.contains(r#""dir":"#),
+            "missing `dir` discriminant: {json}"
+        );
         assert!(
             json.contains(r#""_type":"#),
             "missing `_type` discriminant: {json}"

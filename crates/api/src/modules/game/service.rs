@@ -29,9 +29,7 @@ impl From<GameServiceError> for ApiError {
             GameServiceError::AlreadyInProgress => {
                 ApiError::Conflict("game_already_in_progress".to_owned())
             }
-            GameServiceError::NotInProgress => {
-                ApiError::NotFound("no_game_in_progress".to_owned())
-            }
+            GameServiceError::NotInProgress => ApiError::NotFound("no_game_in_progress".to_owned()),
             GameServiceError::Score(inner) => inner,
         }
     }
@@ -80,7 +78,9 @@ impl<'a> GameService<'a> {
             }
         }
 
-        let game_over = envelopes.iter().any(|e| e.event_type == ScreenEventType::GameOver);
+        let game_over = envelopes
+            .iter()
+            .any(|e| e.event_type == ScreenEventType::GameOver);
         let state_snapshot = engine.take_snapshot();
 
         let session_snapshot = if game_over {
@@ -229,19 +229,14 @@ impl<'a> GameService<'a> {
 
     /// Process an inbound message from the ESP32 bridge.
     /// Silently no-ops if no game is in progress.
-    pub async fn process_inbound(
-        &self,
-        payload: &InboundMessage,
-    ) -> Result<(), GameServiceError> {
+    pub async fn process_inbound(&self, payload: &InboundMessage) -> Result<(), GameServiceError> {
         // Lock order: engine FIRST, session SECOND [§ 4.4]
         let mut engine_guard = self.state.game_engine.lock().await;
         let mut session_guard = self.state.active_session.lock().await;
 
-        let Some(result) = Self::tick_engine(
-            &mut engine_guard,
-            &mut session_guard,
-            |engine| engine.handle_inbound(payload),
-        ) else {
+        let Some(result) = Self::tick_engine(&mut engine_guard, &mut session_guard, |engine| {
+            engine.handle_inbound(payload)
+        }) else {
             return Ok(());
         };
 
@@ -266,11 +261,7 @@ impl<'a> GameService<'a> {
         let key = RailSessionKey { is_ramp, ball_id };
         let (tx, rx) = tokio::sync::oneshot::channel();
 
-        self.state
-            .active_rail_sessions
-            .lock()
-            .await
-            .insert(key, tx);
+        self.state.active_rail_sessions.lock().await.insert(key, tx);
 
         tokio::spawn(rail_ticker_task(self.state.clone(), ball_id, is_ramp, rx));
     }
@@ -299,11 +290,9 @@ impl<'a> GameService<'a> {
         let mut engine_guard = self.state.game_engine.lock().await;
         let mut session_guard = self.state.active_session.lock().await;
 
-        let Some(result) =
-            Self::tick_engine(&mut engine_guard, &mut session_guard, |engine| {
-                engine.process(event)
-            })
-        else {
+        let Some(result) = Self::tick_engine(&mut engine_guard, &mut session_guard, |engine| {
+            engine.process(event)
+        }) else {
             return Err(GameServiceError::NotInProgress);
         };
 
@@ -323,11 +312,9 @@ impl<'a> GameService<'a> {
         let mut engine_guard = self.state.game_engine.lock().await;
         let mut session_guard = self.state.active_session.lock().await;
 
-        let Some(result) = Self::tick_engine(
-            &mut engine_guard,
-            &mut session_guard,
-            |engine| engine.handle_screen_event(envelope),
-        ) else {
+        let Some(result) = Self::tick_engine(&mut engine_guard, &mut session_guard, |engine| {
+            engine.handle_screen_event(envelope)
+        }) else {
             return Ok(());
         };
 

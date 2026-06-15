@@ -63,12 +63,10 @@ impl BonusSkill {
                     duration_ms: SKILL_DAMAGE_BOOST_DURATION_MS,
                 }
             }
-            Self::ComboMultiplier => {
-                SkillEffect::ModifyMultiplier {
-                    factor: SKILL_COMBO_MULTIPLIER_FACTOR,
-                    duration_ms: SKILL_COMBO_MULTIPLIER_DURATION_MS,
-                }
-            }
+            Self::ComboMultiplier => SkillEffect::ModifyMultiplier {
+                factor: SKILL_COMBO_MULTIPLIER_FACTOR,
+                duration_ms: SKILL_COMBO_MULTIPLIER_DURATION_MS,
+            },
             Self::ExtraFlippers => SkillEffect::EmitScreenEvent {
                 event_type: ScreenEventType::ExtraFlippers,
                 payload: serde_json::json!({ "duration_ms": SKILL_EXTRA_FLIPPERS_DURATION_MS }),
