@@ -250,7 +250,7 @@ impl<'a> GameService<'a> {
     /// Start a rail or ramp scoring session for `ball_id`.
     /// Spawns a Tokio task that ticks the engine every `RAIL_TICK_INTERVAL_MS` ms.
     /// If a session already exists for this (kind, ball), it is replaced.
-    pub async fn start_rail(&self, ball_id: Option<u8>, is_ramp: bool) {
+    pub async fn start_rail(&self, ball_id: Option<String>, is_ramp: bool) {
         {
             let engine_guard = self.state.game_engine.lock().await;
             if engine_guard.is_none() {
@@ -258,7 +258,7 @@ impl<'a> GameService<'a> {
             }
         }
 
-        let key = RailSessionKey { is_ramp, ball_id };
+        let key = RailSessionKey { is_ramp, ball_id: ball_id.clone() };
         let (tx, rx) = tokio::sync::oneshot::channel();
 
         self.state.active_rail_sessions.lock().await.insert(key, tx);
@@ -267,7 +267,7 @@ impl<'a> GameService<'a> {
     }
 
     /// Stop the rail/ramp scoring session for `ball_id`.
-    pub async fn end_rail(&self, ball_id: Option<u8>, is_ramp: bool) {
+    pub async fn end_rail(&self, ball_id: Option<String>, is_ramp: bool) {
         let key = RailSessionKey { is_ramp, ball_id };
         self.state.active_rail_sessions.lock().await.remove(&key);
         // Dropping the sender cancels the corresponding task.
@@ -277,7 +277,7 @@ impl<'a> GameService<'a> {
     /// Called exclusively by the internal `rail_ticker_task`.
     pub async fn process_rail_tick(
         &self,
-        ball_id: Option<u8>,
+        ball_id: Option<String>,
         fib_step: u32,
         is_ramp: bool,
     ) -> Result<(), GameServiceError> {
@@ -330,7 +330,7 @@ impl<'a> GameService<'a> {
 /// with an incrementing Fibonacci step until the oneshot cancel fires (sender dropped).
 async fn rail_ticker_task(
     state: AppState,
-    ball_id: Option<u8>,
+    ball_id: Option<String>,
     is_ramp: bool,
     cancel: tokio::sync::oneshot::Receiver<()>,
 ) {
@@ -343,7 +343,7 @@ async fn rail_ticker_task(
             _ = &mut cancel => break,
             _ = tokio::time::sleep(Duration::from_millis(RAIL_TICK_INTERVAL_MS)) => {
                 if GameService::new(&state)
-                    .process_rail_tick(ball_id, fib_step, is_ramp)
+                    .process_rail_tick(ball_id.clone(), fib_step, is_ramp)
                     .await
                     .is_err()
                 {

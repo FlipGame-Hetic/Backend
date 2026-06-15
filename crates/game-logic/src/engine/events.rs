@@ -72,12 +72,12 @@ pub enum GameEvent {
     /// Internal tick emitted by the API-layer rail ticker task.
     /// `fib_step` drives the Fibonacci score progression.
     RailTick {
-        ball_id: Option<u8>,
+        ball_id: Option<String>,
         fib_step: u32,
     },
     /// Internal tick emitted by the API-layer ramp ticker task.
     RampTick {
-        ball_id: Option<u8>,
+        ball_id: Option<String>,
         fib_step: u32,
     },
 }

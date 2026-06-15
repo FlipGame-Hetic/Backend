@@ -170,14 +170,6 @@ async fn process_screen_event(state: &AppState, envelope: &ScreenEnvelope) {
             let ball_id = extract_ball_id(&envelope.payload);
             GameService::new(state).end_rail(ball_id, false).await;
         }
-        ScreenEventType::RampStart => {
-            let ball_id = extract_ball_id(&envelope.payload);
-            GameService::new(state).start_rail(ball_id, true).await;
-        }
-        ScreenEventType::RampEnd => {
-            let ball_id = extract_ball_id(&envelope.payload);
-            GameService::new(state).end_rail(ball_id, true).await;
-        }
         _ => {
             if let Err(e) = GameService::new(state).process_screen_event(envelope).await {
                 error!(error = %e, "game service error processing screen event");
@@ -186,11 +178,11 @@ async fn process_screen_event(state: &AppState, envelope: &ScreenEnvelope) {
     }
 }
 
-fn extract_ball_id(payload: &serde_json::Value) -> Option<u8> {
+fn extract_ball_id(payload: &serde_json::Value) -> Option<String> {
     payload
         .get("ball_id")
-        .and_then(|v| v.as_u64())
-        .and_then(|v| u8::try_from(v).ok())
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string())
 }
 
 async fn write_loop(

@@ -111,6 +111,15 @@ pub const CYBORG_ULTIMATE_MAX: u32 = 450;
 pub const CYBORG_BONUS_COOLDOWN_MS: u64 = 28_000;
 pub const CYBORG_MALUS_COOLDOWN_MS: u64 = 40_000;
 
+// Streak multiplier (triggers on rapid successive scoring events)
+pub const STREAK_WINDOW_MS: u64 = 2_000;
+pub const STREAK_TIER_1_COUNT: u32 = 3;
+pub const STREAK_TIER_2_COUNT: u32 = 6;
+pub const STREAK_TIER_3_COUNT: u32 = 10;
+pub const STREAK_TIER_1_MULTIPLIER: f32 = 1.5;
+pub const STREAK_TIER_2_MULTIPLIER: f32 = 2.0;
+pub const STREAK_TIER_3_MULTIPLIER: f32 = 3.0;
+
 // Rail / Ramp scoring
 pub const RAIL_TICK_INTERVAL_MS: u64 = 100;
 pub const RAIL_BASE_SCORE: u32 = 50;

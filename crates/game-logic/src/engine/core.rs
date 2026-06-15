@@ -3,7 +3,7 @@ use std::time::Instant;
 use shared::events::InboundMessage;
 use shared::screen::{ScreenEnvelope, ScreenEventType, ScreenId, ScreenTarget};
 
-use crate::combo::{ComboDetector, ComboResult, MultiplierState};
+use crate::combo::{ComboDetector, ComboResult, MultiplierState, StreakState};
 use crate::engine::config::{DEFAULT_LIVES, ULTIME_CHARGE_RATIO};
 use crate::engine::events::{ButtonSide, GameEvent, GameOverReason};
 use crate::engine::pve::PveEngine;
@@ -19,6 +19,7 @@ pub struct GameEngine {
     pub state: GameState,
     combo_detector: ComboDetector,
     multiplier: MultiplierState,
+    streak: StreakState,
     pve_engine: PveEngine,
     character: Box<dyn Character>,
     timer_bonus_given: bool,
@@ -30,10 +31,22 @@ impl GameEngine {
             state: GameState::new(DEFAULT_LIVES),
             combo_detector: ComboDetector::new(),
             multiplier: MultiplierState::new(),
+            streak: StreakState::new(),
             pve_engine: PveEngine::new(),
             character: select_character(character_id),
             timer_bonus_given: false,
         }
+    }
+
+    fn effective_multiplier(&self, now: Instant) -> f32 {
+        self.multiplier.current(now) * self.streak.current()
+    }
+
+    fn emit_multiplier_update(&self, now: Instant) -> ScreenEnvelope {
+        make_event_envelope(
+            ScreenEventType::MultiplierUpdate,
+            serde_json::json!({ "multiplier": self.effective_multiplier(now) }),
+        )
     }
 
     pub fn take_snapshot(&self) -> crate::GameSnapshot {
@@ -46,7 +59,7 @@ impl GameEngine {
         };
         crate::GameSnapshot {
             state: self.state.clone(),
-            current_multiplier: self.multiplier.current(now),
+            current_multiplier: self.effective_multiplier(now),
             boss_hp_percent,
         }
     }
@@ -127,6 +140,7 @@ impl GameEngine {
                 self.timer_bonus_given = false;
                 self.combo_detector = ComboDetector::new();
                 self.multiplier = MultiplierState::new();
+                self.streak.reset();
                 self.pve_engine = PveEngine::new();
 
                 let (pve_env, extra) = self.pve_engine.on_event(&event, &mut self.state);
@@ -153,6 +167,7 @@ impl GameEngine {
                 }
                 self.state.balls_lost_since_start += 1;
                 self.state.lives = self.state.lives.saturating_sub(1);
+                self.streak.reset();
 
                 let (pve_env, extra) = self.pve_engine.on_event(&event, &mut self.state);
                 envelopes.extend(pve_env);
@@ -206,7 +221,8 @@ impl GameEngine {
                 if self.state.phase != GamePhase::InGame {
                     return envelopes;
                 }
-                let current_multiplier = self.multiplier.current(now);
+                let streak_changed = self.streak.record(now);
+                let current_multiplier = self.effective_multiplier(now);
                 let scored = match &event {
                     GameEvent::BumperHit { .. } => score_bumper(current_multiplier),
                     _ => score_bumper_triangle(current_multiplier),
@@ -223,6 +239,9 @@ impl GameEngine {
                     envelopes.extend(self.process(e));
                 }
 
+                if streak_changed {
+                    envelopes.push(self.emit_multiplier_update(now));
+                }
                 envelopes.extend(self.check_timer_bonus(now));
                 envelopes.push(self.emit_score_delta(scored, "bumper"));
                 envelopes.push(self.emit_score_update());
@@ -236,8 +255,12 @@ impl GameEngine {
             }
 
             GameEvent::PortalUsed => {
+                let streak_changed = self.streak.record(now);
                 let pts = crate::engine::scoring::score_portal_bonus();
                 self.state.add_score(pts);
+                if streak_changed {
+                    envelopes.push(self.emit_multiplier_update(now));
+                }
                 envelopes.push(self.emit_score_delta(pts, "portal"));
                 envelopes.push(self.emit_score_update());
             }
@@ -246,8 +269,12 @@ impl GameEngine {
                 if self.state.phase != GamePhase::InGame {
                     return envelopes;
                 }
+                let streak_changed = self.streak.record(now);
                 let pts = crate::engine::config::BALL_SAVER_SCORE as u64;
                 self.state.add_score(pts);
+                if streak_changed {
+                    envelopes.push(self.emit_multiplier_update(now));
+                }
                 envelopes.push(self.emit_score_delta(pts, "ball_saver"));
                 envelopes.push(make_event_envelope(
                     ScreenEventType::BallSaverReady,
@@ -284,8 +311,12 @@ impl GameEngine {
             }
 
             GameEvent::MultiballWin => {
+                let streak_changed = self.streak.record(now);
                 let pts = crate::engine::config::MULTIBALL_SCORE as u64;
                 self.state.add_score(pts);
+                if streak_changed {
+                    envelopes.push(self.emit_multiplier_update(now));
+                }
                 envelopes.push(self.emit_score_delta(pts, "multiball"));
                 envelopes.push(make_event_envelope(
                     ScreenEventType::MultiballWin,
@@ -295,11 +326,7 @@ impl GameEngine {
             }
 
             GameEvent::ScoreMultiplierActivated => {
-                let current_multiplier = self.multiplier.current(now);
-                envelopes.push(make_event_envelope(
-                    ScreenEventType::MultiplierUpdate,
-                    serde_json::json!({ "multiplier": current_multiplier }),
-                ));
+                envelopes.push(self.emit_multiplier_update(now));
             }
 
             GameEvent::UltimateActivated { .. } => {
@@ -312,11 +339,14 @@ impl GameEngine {
             }
 
             GameEvent::ComboActivated(effect) => {
-                let prev_multiplier = self.multiplier.current(now);
-                let scaled_bonus = (effect.bonus_pts as f32 * prev_multiplier) as u64;
-                self.multiplier.apply(&effect, now);
+                let streak_changed = self.streak.record(now);
+                let current_multiplier = self.effective_multiplier(now);
+                let scaled_bonus = (effect.bonus_pts as f32 * current_multiplier) as u64;
                 self.state.add_score(scaled_bonus);
                 envelopes.push(self.emit_combo_activated(&effect));
+                if streak_changed {
+                    envelopes.push(self.emit_multiplier_update(now));
+                }
                 envelopes.push(self.emit_score_delta(scaled_bonus, "combo"));
                 envelopes.push(self.emit_score_update());
             }
@@ -343,9 +373,13 @@ impl GameEngine {
                 if self.state.phase != GamePhase::InGame {
                     return envelopes;
                 }
-                let current_multiplier = self.multiplier.current(now);
+                let streak_changed = self.streak.record(now);
+                let current_multiplier = self.effective_multiplier(now);
                 let scored = rail_tick_score(fib_step, current_multiplier);
                 self.state.add_score(scored);
+                if streak_changed {
+                    envelopes.push(self.emit_multiplier_update(now));
+                }
                 envelopes.push(self.emit_scored_delta(scored, "rail", ball_id));
                 envelopes.push(self.emit_score_update());
             }
@@ -354,9 +388,13 @@ impl GameEngine {
                 if self.state.phase != GamePhase::InGame {
                     return envelopes;
                 }
-                let current_multiplier = self.multiplier.current(now);
+                let streak_changed = self.streak.record(now);
+                let current_multiplier = self.effective_multiplier(now);
                 let scored = ramp_tick_score(fib_step, current_multiplier);
                 self.state.add_score(scored);
+                if streak_changed {
+                    envelopes.push(self.emit_multiplier_update(now));
+                }
                 envelopes.push(self.emit_scored_delta(scored, "ramp", ball_id));
                 envelopes.push(self.emit_score_update());
             }
@@ -408,7 +446,7 @@ impl GameEngine {
                 self.multiplier.apply(&combo_effect, now);
                 vec![make_event_envelope(
                     ScreenEventType::MultiplierUpdate,
-                    serde_json::json!({ "multiplier": factor, "duration_ms": duration_ms }),
+                    serde_json::json!({ "multiplier": self.effective_multiplier(now), "duration_ms": duration_ms }),
                 )]
             }
             SkillEffect::AddBalls { count } => vec![make_event_envelope(
@@ -434,7 +472,8 @@ impl GameEngine {
     }
 
     fn emit_score_update(&self) -> ScreenEnvelope {
-        let current_multiplier = self.multiplier.current(Instant::now());
+        let now = Instant::now();
+        let current_multiplier = self.effective_multiplier(now);
         let ball = self.state.balls_lost_since_start + 1;
         make_event_envelope(
             ScreenEventType::ScoreUpdate,
@@ -451,7 +490,7 @@ impl GameEngine {
         self.emit_scored_delta(delta, reason, None)
     }
 
-    fn emit_scored_delta(&self, delta: u64, reason: &str, ball_id: Option<u8>) -> ScreenEnvelope {
+    fn emit_scored_delta(&self, delta: u64, reason: &str, ball_id: Option<String>) -> ScreenEnvelope {
         let mut payload = serde_json::json!({
             "delta": delta,
             "reason": reason,
@@ -604,14 +643,14 @@ mod tests {
     fn rail_tick_includes_ball_id_in_delta() {
         let mut engine = started_engine();
         let envelopes = engine.process(GameEvent::RailTick {
-            ball_id: Some(2),
+            ball_id: Some("ball-uuid-2".to_string()),
             fib_step: 0,
         });
         let delta_env = envelopes
             .iter()
             .find(|e| e.event_type == ScreenEventType::ScoreDelta)
             .expect("ScoreDelta should be emitted");
-        assert_eq!(delta_env.payload["ball_id"], serde_json::json!(2));
+        assert_eq!(delta_env.payload["ball_id"], serde_json::json!("ball-uuid-2"));
     }
 
     #[test]
@@ -667,12 +706,12 @@ mod tests {
 
         let score_before = engine.state.score;
         engine.process(GameEvent::RailTick {
-            ball_id: Some(1),
+            ball_id: Some("ball-uuid-1".to_string()),
             fib_step: 3,
         });
         let after_ball1 = engine.state.score;
         engine.process(GameEvent::RailTick {
-            ball_id: Some(2),
+            ball_id: Some("ball-uuid-2".to_string()),
             fib_step: 3,
         });
         let after_ball2 = engine.state.score;

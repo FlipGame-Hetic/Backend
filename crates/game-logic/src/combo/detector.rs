@@ -156,7 +156,11 @@ impl ComboDetector {
             return penalty;
         }
 
-        self.match_combos(now)
+        let result = self.match_combos(now);
+        if matches!(result, ComboResult::Activated(_)) {
+            self.buffer.clear();
+        }
+        result
     }
 
     fn match_combos(&self, now: Instant) -> ComboResult {

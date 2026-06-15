@@ -12,7 +12,7 @@ use crate::modules::realtime::hub::BridgeHub;
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct RailSessionKey {
     pub is_ramp: bool,
-    pub ball_id: Option<u8>,
+    pub ball_id: Option<String>,
 }
 
 /// Identifies the current player session between StartGame and GameOver.
