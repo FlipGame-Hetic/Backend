@@ -15,7 +15,7 @@ pub struct PveEngine {
 
 impl PveEngine {
     pub fn new() -> Self {
-        let kind = BossKind::GLaDOS;
+        let kind = BossKind::from_index(0).unwrap_or(BossKind::GLaDOS);
         let boss = Boss::new(kind, 0);
         let initial_hp = boss.health.max;
         Self {
@@ -38,7 +38,8 @@ impl PveEngine {
             }
 
             GameEvent::BumperHit { pts } | GameEvent::BumperTriangleHit { pts } => {
-                let damage = boss_damage_to_health(*pts, self.state.current_boss_index);
+                let base_damage = boss_damage_to_health(*pts, self.state.current_boss_index);
+                let damage = (base_damage as f32 * game_state.damage_multiplier) as u32;
                 let died = self.boss.take_hit(damage);
                 self.state.boss_health.current = self.boss.health.current;
 
@@ -218,5 +219,21 @@ mod tests {
                 .iter()
                 .any(|e| matches!(e, GameEvent::GameOverTriggered { .. }))
         );
+    }
+
+    #[test]
+    fn test_damage_multiplier_applied_to_boss() {
+        let mut pve = PveEngine::new();
+        let mut state = make_state();
+        let max_hp = pve.boss.health.max;
+
+        // Hit once without boost — boss should lose exactly `pts` HP
+        pve.on_event(&GameEvent::BumperHit { pts: 100 }, &mut state);
+        assert_eq!(pve.boss_hp(), max_hp - 100);
+
+        // Activate damage boost (x2)
+        state.damage_multiplier = 2.0;
+        pve.on_event(&GameEvent::BumperHit { pts: 100 }, &mut state);
+        assert_eq!(pve.boss_hp(), max_hp - 100 - 200);
     }
 }
