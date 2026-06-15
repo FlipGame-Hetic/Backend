@@ -103,13 +103,36 @@ impl GameEngine {
                     .to_owned();
                 GameEvent::UltimateActivated { player_id }
             }
-            ScreenEventType::Bumper => GameEvent::BumperHit {
-                pts: crate::engine::config::BUMPER_SCORE,
-            },
-            ScreenEventType::BumperTriangle => GameEvent::BumperTriangleHit {
-                pts: crate::engine::config::BUMPER_TRIANGLE_SCORE,
-            },
-            ScreenEventType::PortalUsed => GameEvent::PortalUsed,
+            ScreenEventType::Bumper => {
+                let ball_id = envelope
+                    .payload
+                    .get("ball_id")
+                    .and_then(|v| v.as_str())
+                    .map(String::from);
+                GameEvent::BumperHit {
+                    pts: crate::engine::config::BUMPER_SCORE,
+                    ball_id,
+                }
+            }
+            ScreenEventType::BumperTriangle => {
+                let ball_id = envelope
+                    .payload
+                    .get("ball_id")
+                    .and_then(|v| v.as_str())
+                    .map(String::from);
+                GameEvent::BumperTriangleHit {
+                    pts: crate::engine::config::BUMPER_TRIANGLE_SCORE,
+                    ball_id,
+                }
+            }
+            ScreenEventType::PortalUsed => {
+                let ball_id = envelope
+                    .payload
+                    .get("ball_id")
+                    .and_then(|v| v.as_str())
+                    .map(String::from);
+                GameEvent::PortalUsed { ball_id }
+            }
             ScreenEventType::FlipperLeft => GameEvent::ButtonPressed {
                 side: ButtonSide::Left,
             },
@@ -147,7 +170,7 @@ impl GameEngine {
                 for e in extra {
                     envelopes.extend(self.process(e));
                 }
-                envelopes.push(self.emit_score_update());
+                envelopes.push(self.emit_score_update(None));
                 envelopes.push(self.emit_life_update());
             }
 
@@ -204,7 +227,7 @@ impl GameEngine {
                         } else {
                             self.state.score = self.state.score.saturating_add(pts as u64);
                         }
-                        envelopes.push(self.emit_score_update());
+                        envelopes.push(self.emit_score_update(None));
                     }
                     ComboResult::BadgeUnlocked { badge_id } => {
                         envelopes.push(make_event_envelope(
@@ -216,10 +239,11 @@ impl GameEngine {
                 }
             }
 
-            GameEvent::BumperHit { pts } | GameEvent::BumperTriangleHit { pts } => {
+            GameEvent::BumperHit { pts, ref ball_id } | GameEvent::BumperTriangleHit { pts, ref ball_id } => {
                 if self.state.phase != GamePhase::InGame {
                     return envelopes;
                 }
+                let bid = ball_id.clone();
                 let streak_changed = self.streak.record(now);
                 let current_multiplier = self.effective_multiplier(now);
                 let scored = match &event {
@@ -242,8 +266,8 @@ impl GameEngine {
                     envelopes.push(self.emit_multiplier_update(now));
                 }
                 envelopes.extend(self.check_timer_bonus(now));
-                envelopes.push(self.emit_score_delta(scored, "bumper"));
-                envelopes.push(self.emit_score_update());
+                envelopes.push(self.emit_scored_delta(scored, "bumper", bid.clone()));
+                envelopes.push(self.emit_score_update(bid));
             }
 
             GameEvent::MultiballTriggered => {
@@ -253,15 +277,16 @@ impl GameEngine {
                 envelopes.extend(self.process(GameEvent::MultiballWin));
             }
 
-            GameEvent::PortalUsed => {
+            GameEvent::PortalUsed { ref ball_id } => {
+                let bid = ball_id.clone();
                 let streak_changed = self.streak.record(now);
                 let pts = crate::engine::scoring::score_portal_bonus();
                 self.state.add_score(pts);
                 if streak_changed {
                     envelopes.push(self.emit_multiplier_update(now));
                 }
-                envelopes.push(self.emit_score_delta(pts, "portal"));
-                envelopes.push(self.emit_score_update());
+                envelopes.push(self.emit_scored_delta(pts, "portal", bid.clone()));
+                envelopes.push(self.emit_score_update(bid));
             }
 
             GameEvent::BallSaverReady => {
@@ -279,7 +304,7 @@ impl GameEngine {
                     ScreenEventType::BallSaverReady,
                     serde_json::Value::Null,
                 ));
-                envelopes.push(self.emit_score_update());
+                envelopes.push(self.emit_score_update(None));
             }
 
             GameEvent::TiltDetected => {
@@ -287,7 +312,7 @@ impl GameEngine {
                 match effect {
                     TiltEffect::Penalty(pts) => {
                         self.state.score = apply_tilt_penalty(self.state.score, pts);
-                        envelopes.push(self.emit_score_update());
+                        envelopes.push(self.emit_score_update(None));
                         envelopes.push(make_event_envelope(
                             ScreenEventType::TiltPenalty,
                             serde_json::json!({ "penalty": pts }),
@@ -321,7 +346,7 @@ impl GameEngine {
                     ScreenEventType::MultiballWin,
                     serde_json::Value::Null,
                 ));
-                envelopes.push(self.emit_score_update());
+                envelopes.push(self.emit_score_update(None));
             }
 
             GameEvent::ScoreMultiplierActivated => {
@@ -347,7 +372,7 @@ impl GameEngine {
                     envelopes.push(self.emit_multiplier_update(now));
                 }
                 envelopes.push(self.emit_score_delta(scaled_bonus, "combo"));
-                envelopes.push(self.emit_score_update());
+                envelopes.push(self.emit_score_update(None));
             }
 
             GameEvent::BossDefeated { boss_id } => {
@@ -372,6 +397,7 @@ impl GameEngine {
                 if self.state.phase != GamePhase::InGame {
                     return envelopes;
                 }
+                let bid = ball_id.clone();
                 let streak_changed = self.streak.record(now);
                 let current_multiplier = self.effective_multiplier(now);
                 let scored = rail_tick_score(fib_step, current_multiplier);
@@ -380,7 +406,7 @@ impl GameEngine {
                     envelopes.push(self.emit_multiplier_update(now));
                 }
                 envelopes.push(self.emit_scored_delta(scored, "rail", ball_id));
-                envelopes.push(self.emit_score_update());
+                envelopes.push(self.emit_score_update(bid));
             }
 
         }
@@ -409,7 +435,7 @@ impl GameEngine {
                     serde_json::json!({ "new_score": self.state.score }),
                 ),
                 self.emit_score_delta(delta, "timer_bonus"),
-                self.emit_score_update(),
+                self.emit_score_update(None),
             ];
         }
         vec![]
@@ -444,7 +470,7 @@ impl GameEngine {
             )],
             SkillEffect::AddScore { pts } => {
                 self.state.add_score(pts as u64);
-                vec![self.emit_score_update()]
+                vec![self.emit_score_update(None)]
             }
             SkillEffect::EmitScreenEvent {
                 event_type,
@@ -456,19 +482,20 @@ impl GameEngine {
         }
     }
 
-    fn emit_score_update(&self) -> ScreenEnvelope {
+    fn emit_score_update(&self, ball_id: Option<String>) -> ScreenEnvelope {
         let now = Instant::now();
         let current_multiplier = self.effective_multiplier(now);
         let ball = self.state.balls_lost_since_start + 1;
-        make_event_envelope(
-            ScreenEventType::ScoreUpdate,
-            serde_json::json!({
-                "score": self.state.score,
-                "multiplier": current_multiplier,
-                "player": self.state.player_id,
-                "ball": ball,
-            }),
-        )
+        let mut payload = serde_json::json!({
+            "score": self.state.score,
+            "multiplier": current_multiplier,
+            "player": self.state.player_id,
+            "ball": ball,
+        });
+        if let Some(bid) = ball_id {
+            payload["ball_id"] = serde_json::json!(bid);
+        }
+        make_event_envelope(ScreenEventType::ScoreUpdate, payload)
     }
 
     fn emit_score_delta(&self, delta: u64, reason: &str) -> ScreenEnvelope {
@@ -703,5 +730,59 @@ mod tests {
             engine.state.score, before,
             "tick after GameOver must not change score"
         );
+    }
+
+    #[test]
+    fn rail_tick_includes_ball_id_in_score_update() {
+        let mut engine = started_engine();
+        let envelopes = engine.process(GameEvent::RailTick {
+            ball_id: Some("ball-uuid-2".to_string()),
+            fib_step: 0,
+        });
+        let update_env = envelopes
+            .iter()
+            .find(|e| e.event_type == ScreenEventType::ScoreUpdate)
+            .expect("ScoreUpdate should be emitted");
+        assert_eq!(update_env.payload["ball_id"], serde_json::json!("ball-uuid-2"));
+    }
+
+    #[test]
+    fn bumper_hit_includes_ball_id_in_score_events() {
+        let mut engine = started_engine();
+        let envelopes = engine.process(GameEvent::BumperHit {
+            pts: 100,
+            ball_id: Some("ball-abc".to_string()),
+        });
+        let delta_env = envelopes
+            .iter()
+            .find(|e| e.event_type == ScreenEventType::ScoreDelta)
+            .expect("ScoreDelta should be emitted");
+        assert_eq!(delta_env.payload["ball_id"], serde_json::json!("ball-abc"));
+
+        let update_env = envelopes
+            .iter()
+            .find(|e| e.event_type == ScreenEventType::ScoreUpdate)
+            .expect("ScoreUpdate should be emitted");
+        assert_eq!(update_env.payload["ball_id"], serde_json::json!("ball-abc"));
+    }
+
+    #[test]
+    fn bumper_hit_no_ball_id_omits_field() {
+        let mut engine = started_engine();
+        let envelopes = engine.process(GameEvent::BumperHit {
+            pts: 100,
+            ball_id: None,
+        });
+        let delta_env = envelopes
+            .iter()
+            .find(|e| e.event_type == ScreenEventType::ScoreDelta)
+            .expect("ScoreDelta should be emitted");
+        assert!(delta_env.payload.get("ball_id").is_none());
+
+        let update_env = envelopes
+            .iter()
+            .find(|e| e.event_type == ScreenEventType::ScoreUpdate)
+            .expect("ScoreUpdate should be emitted");
+        assert!(update_env.payload.get("ball_id").is_none());
     }
 }

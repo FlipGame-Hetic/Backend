@@ -1,16 +1,16 @@
 //Core game settings
 pub const DEFAULT_LIVES: u8 = 3;
 pub const ULTIME_CHARGE_RATIO: u32 = 100;
-pub const BALL_SAVER_SCORE: u32 = 500;
+pub const BALL_SAVER_SCORE: u32 = 300;
 
 // Bumper scoring
 pub const BUMPER_SCORE: u32 = 100;
-pub const BUMPER_TRIANGLE_SCORE: u32 = 200;
-pub const PORTAL_SCORE: u32 = 300;
+pub const BUMPER_TRIANGLE_SCORE: u32 = 150;
+pub const PORTAL_SCORE: u32 = 200;
 
 // Multiball
 pub const MULTIBALL_RING_THRESHOLD: u32 = 10;
-pub const MULTIBALL_SCORE: u32 = 5_000;
+pub const MULTIBALL_SCORE: u32 = 600;
 
 // Timer bonus (BonusGameTimerMultiplier)
 pub const TIMER_BONUS_SECONDS: u64 = 60;
@@ -22,9 +22,9 @@ pub const TILT_PENALTY_1: i64 = -2_000;
 pub const TILT_PENALTY_2: i64 = -6_000;
 
 // Boss HP
-pub const BOSS_0_HP: u32 = 500;
-pub const BOSS_1_HP: u32 = 800;
-pub const BOSS_2_HP: u32 = 1_200;
+pub const BOSS_0_HP: u32 = 5000;
+pub const BOSS_1_HP: u32 = 8000;
+pub const BOSS_2_HP: u32 = 10_200;
 
 // Boss difficulty scaling
 pub const BOSS_0_DIFFICULTY_SCALE: f32 = 1.0;
@@ -35,7 +35,7 @@ pub const ENDLESS_LEVEL_SCALE_EXPONENT: f32 = 1.3;
 
 // Combo system
 pub const COMBO_BUFFER_MAX: usize = 10;
-pub const COMBO_DETECTION_WINDOW_MS: u64 = 3_000;
+pub const COMBO_DETECTION_WINDOW_MS: u64 = 2_000;
 pub const COMBO_PENALTY_REPEAT: usize = 7;
 pub const COMBO_PENALTY_PTS: i64 = 2_000;
 
@@ -113,18 +113,18 @@ pub const CYBORG_MALUS_COOLDOWN_MS: u64 = 40_000;
 
 // Streak multiplier (triggers on rapid successive scoring events)
 pub const STREAK_WINDOW_MS: u64 = 2_000;
-pub const STREAK_TIER_1_COUNT: u32 = 3;
-pub const STREAK_TIER_2_COUNT: u32 = 6;
+pub const STREAK_TIER_1_COUNT: u32 = 2;
+pub const STREAK_TIER_2_COUNT: u32 = 5;
 pub const STREAK_TIER_3_COUNT: u32 = 10;
 pub const STREAK_TIER_1_MULTIPLIER: f32 = 1.5;
 pub const STREAK_TIER_2_MULTIPLIER: f32 = 2.0;
 pub const STREAK_TIER_3_MULTIPLIER: f32 = 3.0;
 
-// Rail scoring
-pub const RAIL_TICK_INTERVAL_MS: u64 = 100;
-pub const RAIL_BASE_SCORE: u32 = 50;
+// Rail
+pub const RAIL_TICK_INTERVAL_MS: u64 = 300;
+pub const RAIL_BASE_SCORE: u32 = 10;
 /// Fibonacci step is capped so the score per tick doesn't blow up.
-pub const RAIL_MAX_FIB_STEP: u32 = 10;
+pub const RAIL_MAX_FIB_STEP: u32 = 200;
 
 // Skill effects
 pub const SKILL_SHIELD_DURATION_MS: u64 = 8_000;

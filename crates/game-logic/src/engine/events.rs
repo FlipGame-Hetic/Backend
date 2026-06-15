@@ -47,11 +47,15 @@ pub enum GameEvent {
     },
     BumperHit {
         pts: u32,
+        ball_id: Option<String>,
     },
     BumperTriangleHit {
         pts: u32,
+        ball_id: Option<String>,
     },
-    PortalUsed,
+    PortalUsed {
+        ball_id: Option<String>,
+    },
     BallSaverReady,
     TiltDetected,
     LifeUp,

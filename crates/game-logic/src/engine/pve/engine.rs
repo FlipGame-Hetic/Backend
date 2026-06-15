@@ -37,7 +37,7 @@ impl PveEngine {
                 self.reset_to_boss(0, &mut envelopes);
             }
 
-            GameEvent::BumperHit { pts } | GameEvent::BumperTriangleHit { pts } => {
+            GameEvent::BumperHit { pts, .. } | GameEvent::BumperTriangleHit { pts, .. } => {
                 let base_damage = boss_damage_to_health(*pts, self.state.current_boss_index);
                 let damage = (base_damage as f32 * game_state.damage_multiplier) as u32;
                 let died = self.boss.take_hit(damage);
@@ -183,7 +183,7 @@ mod tests {
         let mut state = make_state();
 
         let hp = pve.boss.health.max;
-        let (_, events) = pve.on_event(&GameEvent::BumperHit { pts: hp }, &mut state);
+        let (_, events) = pve.on_event(&GameEvent::BumperHit { ball_id: None, pts: hp }, &mut state);
 
         assert!(
             events
@@ -200,7 +200,7 @@ mod tests {
 
         for _ in 0..3 {
             let hp = pve.boss.health.max;
-            pve.on_event(&GameEvent::BumperHit { pts: hp }, &mut state);
+            pve.on_event(&GameEvent::BumperHit { ball_id: None, pts: hp }, &mut state);
         }
 
         assert_eq!(*pve.phase(), PvePhase::Victory);
@@ -228,12 +228,12 @@ mod tests {
         let max_hp = pve.boss.health.max;
 
         // Hit once without boost — boss should lose exactly `pts` HP
-        pve.on_event(&GameEvent::BumperHit { pts: 100 }, &mut state);
+        pve.on_event(&GameEvent::BumperHit { ball_id: None, pts: 100 }, &mut state);
         assert_eq!(pve.boss_hp(), max_hp - 100);
 
         // Activate damage boost (x2)
         state.damage_multiplier = 2.0;
-        pve.on_event(&GameEvent::BumperHit { pts: 100 }, &mut state);
+        pve.on_event(&GameEvent::BumperHit { ball_id: None, pts: 100 }, &mut state);
         assert_eq!(pve.boss_hp(), max_hp - 100 - 200);
     }
 }
