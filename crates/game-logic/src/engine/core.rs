@@ -308,10 +308,12 @@ impl GameEngine {
             }
 
             GameEvent::ComboActivated(effect) => {
+                let prev_multiplier = self.multiplier.current(now);
+                let scaled_bonus = (effect.bonus_pts as f32 * prev_multiplier) as u64;
                 self.multiplier.apply(&effect, now);
-                self.state.add_score(effect.bonus_pts as u64);
+                self.state.add_score(scaled_bonus);
                 envelopes.push(self.emit_combo_activated(&effect));
-                envelopes.push(self.emit_score_delta(effect.bonus_pts as u64, "combo"));
+                envelopes.push(self.emit_score_delta(scaled_bonus, "combo"));
                 envelopes.push(self.emit_score_update());
             }
 
