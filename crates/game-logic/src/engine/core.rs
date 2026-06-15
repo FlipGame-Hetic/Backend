@@ -8,7 +8,8 @@ use crate::engine::config::{DEFAULT_LIVES, ULTIME_CHARGE_RATIO};
 use crate::engine::events::{ButtonSide, GameEvent, GameOverReason};
 use crate::engine::pve::PveEngine;
 use crate::engine::scoring::{
-    apply_tilt_penalty, score_bumper, score_bumper_triangle, timer_bonus,
+    apply_tilt_penalty, rail_tick_score, ramp_tick_score, score_bumper, score_bumper_triangle,
+    timer_bonus,
 };
 use crate::engine::states::{GamePhase, GameState, TiltEffect};
 use crate::player::personnages::character::{Character, select_character};
@@ -334,6 +335,28 @@ impl GameEngine {
             GameEvent::TimerBonusCheck => {
                 envelopes.extend(self.check_timer_bonus(now));
             }
+
+            GameEvent::RailTick { ball_id, fib_step } => {
+                if self.state.phase != GamePhase::InGame {
+                    return envelopes;
+                }
+                let current_multiplier = self.multiplier.current(now);
+                let scored = rail_tick_score(fib_step, current_multiplier);
+                self.state.add_score(scored);
+                envelopes.push(self.emit_scored_delta(scored, "rail", ball_id));
+                envelopes.push(self.emit_score_update());
+            }
+
+            GameEvent::RampTick { ball_id, fib_step } => {
+                if self.state.phase != GamePhase::InGame {
+                    return envelopes;
+                }
+                let current_multiplier = self.multiplier.current(now);
+                let scored = ramp_tick_score(fib_step, current_multiplier);
+                self.state.add_score(scored);
+                envelopes.push(self.emit_scored_delta(scored, "ramp", ball_id));
+                envelopes.push(self.emit_score_update());
+            }
         }
 
         envelopes
@@ -422,14 +445,19 @@ impl GameEngine {
     }
 
     fn emit_score_delta(&self, delta: u64, reason: &str) -> ScreenEnvelope {
-        make_event_envelope(
-            ScreenEventType::ScoreDelta,
-            serde_json::json!({
-                "delta": delta,
-                "reason": reason,
-                "total": self.state.score,
-            }),
-        )
+        self.emit_scored_delta(delta, reason, None)
+    }
+
+    fn emit_scored_delta(&self, delta: u64, reason: &str, ball_id: Option<u8>) -> ScreenEnvelope {
+        let mut payload = serde_json::json!({
+            "delta": delta,
+            "reason": reason,
+            "total": self.state.score,
+        });
+        if let Some(bid) = ball_id {
+            payload["ball_id"] = serde_json::json!(bid);
+        }
+        make_event_envelope(ScreenEventType::ScoreDelta, payload)
     }
 
     fn emit_life_update(&self) -> ScreenEnvelope {
@@ -465,5 +493,150 @@ fn make_event_envelope(event_type: ScreenEventType, payload: serde_json::Value) 
         to: ScreenTarget::Broadcast,
         event_type,
         payload,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::engine::events::{GameEvent, GameOverReason};
+
+    fn started_engine() -> GameEngine {
+        let mut engine = GameEngine::new(1);
+        engine.process(GameEvent::StartGame {
+            player_id: "test".into(),
+        });
+        engine
+    }
+
+    #[test]
+    fn rail_tick_increases_score() {
+        let mut engine = started_engine();
+        let before = engine.state.score;
+        let envelopes = engine.process(GameEvent::RailTick {
+            ball_id: None,
+            fib_step: 0,
+        });
+        assert!(engine.state.score > before, "score should increase after RailTick");
+        assert!(
+            envelopes.iter().any(|e| e.event_type == ScreenEventType::ScoreDelta),
+            "should emit ScoreDelta"
+        );
+        assert!(
+            envelopes.iter().any(|e| e.event_type == ScreenEventType::ScoreUpdate),
+            "should emit ScoreUpdate"
+        );
+    }
+
+    #[test]
+    fn ramp_tick_increases_score_more_than_rail() {
+        let mut engine_rail = started_engine();
+        engine_rail.process(GameEvent::RailTick { ball_id: None, fib_step: 0 });
+        let rail_score = engine_rail.state.score;
+
+        let mut engine_ramp = started_engine();
+        engine_ramp.process(GameEvent::RampTick { ball_id: None, fib_step: 0 });
+        let ramp_score = engine_ramp.state.score;
+
+        assert!(ramp_score > rail_score, "ramp base score should be higher than rail");
+    }
+
+    #[test]
+    fn rail_tick_fibonacci_progression() {
+        let mut engine = started_engine();
+        let s0 = {
+            engine.process(GameEvent::RailTick { ball_id: None, fib_step: 0 });
+            engine.state.score
+        };
+        let s1 = {
+            engine.process(GameEvent::RailTick { ball_id: None, fib_step: 1 });
+            engine.state.score
+        };
+        let s2 = {
+            engine.process(GameEvent::RailTick { ball_id: None, fib_step: 2 });
+            engine.state.score
+        };
+        // Delta at step 0 and 1 are equal (fib(0)=fib(1)=1), step 2 is larger.
+        let d0 = s1 - s0;
+        let d1 = s2 - s1; // d1 is actually delta for fib_step=2 (fib=2), not fib_step=1 (fib=1)
+        // Wait, engine score is cumulative, so:
+        // s0 = fib(0)*base, d0 = s1-s0 = fib(1)*base, d1 = s2-s1 = fib(2)*base
+        // fib(0)=1, fib(1)=1, fib(2)=2 → d0 == d0_expected and d1 > d0
+        assert_eq!(d0, s0, "fib(0)==fib(1) so step-0 and step-1 deltas should be equal");
+        assert!(d1 > d0, "step-2 delta should be larger than step-1 (fib grows)");
+    }
+
+    #[test]
+    fn rail_tick_includes_ball_id_in_delta() {
+        let mut engine = started_engine();
+        let envelopes = engine.process(GameEvent::RailTick {
+            ball_id: Some(2),
+            fib_step: 0,
+        });
+        let delta_env = envelopes
+            .iter()
+            .find(|e| e.event_type == ScreenEventType::ScoreDelta)
+            .expect("ScoreDelta should be emitted");
+        assert_eq!(delta_env.payload["ball_id"], serde_json::json!(2));
+    }
+
+    #[test]
+    fn rail_tick_no_ball_id_omits_field() {
+        let mut engine = started_engine();
+        let envelopes = engine.process(GameEvent::RailTick {
+            ball_id: None,
+            fib_step: 0,
+        });
+        let delta_env = envelopes
+            .iter()
+            .find(|e| e.event_type == ScreenEventType::ScoreDelta)
+            .expect("ScoreDelta should be emitted");
+        assert!(delta_env.payload.get("ball_id").is_none(), "ball_id should be absent when None");
+    }
+
+    #[test]
+    fn rail_tick_ignored_when_not_in_game() {
+        let mut engine = GameEngine::new(1);
+        // Phase is Idle, no StartGame called.
+        let before = engine.state.score;
+        engine.process(GameEvent::RailTick { ball_id: None, fib_step: 0 });
+        assert_eq!(engine.state.score, before, "tick outside InGame must not change score");
+    }
+
+    #[test]
+    fn rail_tick_ignored_when_cheating_detected() {
+        let mut engine = started_engine();
+        engine.state.cheating_detected = true;
+        let before = engine.state.score;
+        engine.process(GameEvent::RailTick { ball_id: None, fib_step: 0 });
+        assert_eq!(engine.state.score, before, "score must be locked when cheating detected");
+    }
+
+    #[test]
+    fn multiball_two_balls_score_independently() {
+        let mut engine = started_engine();
+
+        let score_before = engine.state.score;
+        engine.process(GameEvent::RailTick { ball_id: Some(1), fib_step: 3 });
+        let after_ball1 = engine.state.score;
+        engine.process(GameEvent::RailTick { ball_id: Some(2), fib_step: 3 });
+        let after_ball2 = engine.state.score;
+
+        // Both ticks add score and each delta should be equal (same fib_step + multiplier).
+        let d1 = after_ball1 - score_before;
+        let d2 = after_ball2 - after_ball1;
+        assert!(d1 > 0);
+        assert_eq!(d1, d2, "same fib_step → same delta regardless of ball_id");
+    }
+
+    #[test]
+    fn game_over_ignored_rail_tick() {
+        let mut engine = started_engine();
+        engine.process(GameEvent::GameOverTriggered {
+            reason: GameOverReason::NoLivesLeft,
+        });
+        let before = engine.state.score;
+        engine.process(GameEvent::RailTick { ball_id: None, fib_step: 0 });
+        assert_eq!(engine.state.score, before, "tick after GameOver must not change score");
     }
 }

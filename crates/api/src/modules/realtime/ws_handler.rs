@@ -46,6 +46,7 @@ async fn handle_bridge(socket: WebSocket, state: AppState) {
         }
     }
 
+    *state.active_device_id.write().await = None;
     info!("bridge websocket disconnected");
 }
 

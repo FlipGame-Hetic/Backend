@@ -138,31 +138,59 @@ async fn read_loop(
 }
 
 async fn process_screen_event(state: &AppState, envelope: &ScreenEnvelope) {
-    if envelope.event_type == ScreenEventType::StartGame {
-        let player_id = envelope
-            .payload
-            .get("player_id")
-            .and_then(|v| v.as_str())
-            .unwrap_or("unknown")
-            .to_owned();
-        let character_id = envelope
-            .payload
-            .get("character_id")
-            .and_then(|v| v.as_u64())
-            .unwrap_or(1) as u8;
+    match &envelope.event_type {
+        ScreenEventType::StartGame => {
+            let player_id = envelope
+                .payload
+                .get("player_id")
+                .and_then(|v| v.as_str())
+                .unwrap_or("unknown")
+                .to_owned();
+            let character_id = envelope
+                .payload
+                .get("character_id")
+                .and_then(|v| v.as_u64())
+                .unwrap_or(1) as u8;
 
-        match GameService::new(state).start(player_id, character_id).await {
-            Ok(_) => {}
-            Err(GameServiceError::AlreadyInProgress) => {
-                warn!("StartGame ignored — game already in progress");
-            }
-            Err(e) => {
-                error!(error = %e, "game service error starting game from screen");
+            match GameService::new(state).start(player_id, character_id).await {
+                Ok(_) => {}
+                Err(GameServiceError::AlreadyInProgress) => {
+                    warn!("StartGame ignored — game already in progress");
+                }
+                Err(e) => {
+                    error!(error = %e, "game service error starting game from screen");
+                }
             }
         }
-    } else if let Err(e) = GameService::new(state).process_screen_event(envelope).await {
-        error!(error = %e, "game service error processing screen event");
+        ScreenEventType::RailStart => {
+            let ball_id = extract_ball_id(&envelope.payload);
+            GameService::new(state).start_rail(ball_id, false).await;
+        }
+        ScreenEventType::RailEnd => {
+            let ball_id = extract_ball_id(&envelope.payload);
+            GameService::new(state).end_rail(ball_id, false).await;
+        }
+        ScreenEventType::RampStart => {
+            let ball_id = extract_ball_id(&envelope.payload);
+            GameService::new(state).start_rail(ball_id, true).await;
+        }
+        ScreenEventType::RampEnd => {
+            let ball_id = extract_ball_id(&envelope.payload);
+            GameService::new(state).end_rail(ball_id, true).await;
+        }
+        _ => {
+            if let Err(e) = GameService::new(state).process_screen_event(envelope).await {
+                error!(error = %e, "game service error processing screen event");
+            }
+        }
     }
+}
+
+fn extract_ball_id(payload: &serde_json::Value) -> Option<u8> {
+    payload
+        .get("ball_id")
+        .and_then(|v| v.as_u64())
+        .and_then(|v| u8::try_from(v).ok())
 }
 
 async fn write_loop(

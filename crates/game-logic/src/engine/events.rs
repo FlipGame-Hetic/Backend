@@ -55,4 +55,9 @@ pub enum GameEvent {
     BossDefeated { boss_id: u8 },
     GameOverTriggered { reason: GameOverReason },
     TimerBonusCheck,
+    /// Internal tick emitted by the API-layer rail ticker task.
+    /// `fib_step` drives the Fibonacci score progression.
+    RailTick { ball_id: Option<u8>, fib_step: u32 },
+    /// Internal tick emitted by the API-layer ramp ticker task.
+    RampTick { ball_id: Option<u8>, fib_step: u32 },
 }

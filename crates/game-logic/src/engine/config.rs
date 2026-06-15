@@ -111,6 +111,13 @@ pub const CYBORG_ULTIMATE_MAX: u32 = 450;
 pub const CYBORG_BONUS_COOLDOWN_MS: u64 = 28_000;
 pub const CYBORG_MALUS_COOLDOWN_MS: u64 = 40_000;
 
+// Rail / Ramp scoring
+pub const RAIL_TICK_INTERVAL_MS: u64 = 100;
+pub const RAIL_BASE_SCORE: u32 = 50;
+pub const RAMP_BASE_SCORE: u32 = 75;
+/// Fibonacci step is capped so the score per tick doesn't blow up.
+pub const RAIL_MAX_FIB_STEP: u32 = 10;
+
 // Skill effects
 pub const SKILL_SHIELD_DURATION_MS: u64 = 8_000;
 

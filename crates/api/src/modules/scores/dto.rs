@@ -8,7 +8,7 @@ pub struct ScoreEntry {
     pub character_id: i64,
     pub score: i64,
     pub boss_reached: i64,
-    pub created_at: String,
+    pub created_at: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, JsonSchema)]
