@@ -40,10 +40,6 @@ pub const COMBO_PENALTY_REPEAT: usize = 7;
 pub const COMBO_PENALTY_PTS: i64 = 2_000;
 
 // Combo stats: (bonus_pts, multiplier, duration_ms)
-pub const COMBO_1_BONUS: u32 = 0;
-pub const COMBO_1_MULTIPLIER: f32 = 1.2;
-pub const COMBO_1_DURATION_MS: u64 = 1_000;
-
 pub const COMBO_2_BONUS: u32 = 0;
 pub const COMBO_2_MULTIPLIER: f32 = 1.5;
 pub const COMBO_2_DURATION_MS: u64 = 1_500;
@@ -72,13 +68,31 @@ pub const COMBO_8_BONUS: u32 = 1_500;
 pub const COMBO_8_MULTIPLIER: f32 = 1.5;
 pub const COMBO_8_DURATION_MS: u64 = 3_000;
 
-pub const COMBO_12_BONUS: u32 = 0;
-pub const COMBO_12_MULTIPLIER: f32 = 2.0;
-pub const COMBO_12_DURATION_MS: u64 = 500;
+// Hard 6-button combos
+pub const COMBO_9_BONUS: u32 = 3_000;
+pub const COMBO_9_MULTIPLIER: f32 = 2.5;
+pub const COMBO_9_DURATION_MS: u64 = 2_500;
 
-pub const COMBO_13_BONUS: u32 = 0;
-pub const COMBO_13_MULTIPLIER: f32 = 1.5;
-pub const COMBO_13_DURATION_MS: u64 = 500;
+pub const COMBO_10_BONUS: u32 = 3_000;
+pub const COMBO_10_MULTIPLIER: f32 = 2.5;
+pub const COMBO_10_DURATION_MS: u64 = 2_500;
+
+pub const COMBO_11_BONUS: u32 = 3_500;
+pub const COMBO_11_MULTIPLIER: f32 = 2.5;
+pub const COMBO_11_DURATION_MS: u64 = 2_000;
+
+// Very hard 7-button combos
+pub const COMBO_14_BONUS: u32 = 8_000;
+pub const COMBO_14_MULTIPLIER: f32 = 3.5;
+pub const COMBO_14_DURATION_MS: u64 = 3_000;
+
+pub const COMBO_15_BONUS: u32 = 8_000;
+pub const COMBO_15_MULTIPLIER: f32 = 3.5;
+pub const COMBO_15_DURATION_MS: u64 = 3_000;
+
+pub const COMBO_16_BONUS: u32 = 6_000;
+pub const COMBO_16_MULTIPLIER: f32 = 3.0;
+pub const COMBO_16_DURATION_MS: u64 = 2_000;
 
 // Character stats
 pub const ROBOCP_ULTIMATE_MAX: u32 = 500;
