@@ -1,6 +1,6 @@
 use crate::engine::config::{
     BUMPER_SCORE, BUMPER_TRIANGLE_SCORE, PORTAL_SCORE, RAIL_BASE_SCORE, RAIL_MAX_FIB_STEP,
-    RAMP_BASE_SCORE, TIMER_BONUS_MULTIPLIER, TIMER_BONUS_SCORE,
+    TIMER_BONUS_MULTIPLIER, TIMER_BONUS_SCORE,
 };
 
 pub fn score_bumper(multiplier: f32) -> u64 {
@@ -56,10 +56,6 @@ pub fn rail_tick_score(fib_step: u32, multiplier: f32) -> u64 {
     (RAIL_BASE_SCORE as f32 * fib * multiplier) as u64
 }
 
-pub fn ramp_tick_score(fib_step: u32, multiplier: f32) -> u64 {
-    let fib = fibonacci(fib_step.min(RAIL_MAX_FIB_STEP)) as f32;
-    (RAMP_BASE_SCORE as f32 * fib * multiplier) as u64
-}
 
 #[cfg(test)]
 mod tests {
@@ -127,12 +123,6 @@ mod tests {
     fn test_rail_tick_score_step_4_with_multiplier() {
         // fib(4)=5, base=50, mult=2.0 → 500
         assert_eq!(rail_tick_score(4, 2.0), 500);
-    }
-
-    #[test]
-    fn test_ramp_tick_score_step_2_no_multiplier() {
-        // fib(2)=2, base=75, mult=1.0 → 150
-        assert_eq!(ramp_tick_score(2, 1.0), 150);
     }
 
     #[test]

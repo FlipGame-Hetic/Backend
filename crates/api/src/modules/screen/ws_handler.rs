@@ -164,11 +164,11 @@ async fn process_screen_event(state: &AppState, envelope: &ScreenEnvelope) {
         }
         ScreenEventType::RailStart => {
             let ball_id = extract_ball_id(&envelope.payload);
-            GameService::new(state).start_rail(ball_id, false).await;
+            GameService::new(state).start_rail(ball_id).await;
         }
         ScreenEventType::RailEnd => {
             let ball_id = extract_ball_id(&envelope.payload);
-            GameService::new(state).end_rail(ball_id, false).await;
+            GameService::new(state).end_rail(ball_id).await;
         }
         _ => {
             if let Err(e) = GameService::new(state).process_screen_event(envelope).await {

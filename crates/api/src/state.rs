@@ -8,10 +8,9 @@ use tokio::sync::Mutex;
 
 use crate::modules::realtime::hub::BridgeHub;
 
-/// Identifies a single rail/ramp scoring session, unique per (kind, ball).
+/// Identifies a single rail scoring session, unique per ball.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct RailSessionKey {
-    pub is_ramp: bool,
     pub ball_id: Option<String>,
 }
 

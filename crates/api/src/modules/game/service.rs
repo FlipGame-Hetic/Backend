@@ -247,10 +247,10 @@ impl<'a> GameService<'a> {
         self.dispatch_sync_and_save(result).await
     }
 
-    /// Start a rail or ramp scoring session for `ball_id`.
+    /// Start a rail scoring session for `ball_id`.
     /// Spawns a Tokio task that ticks the engine every `RAIL_TICK_INTERVAL_MS` ms.
-    /// If a session already exists for this (kind, ball), it is replaced.
-    pub async fn start_rail(&self, ball_id: Option<String>, is_ramp: bool) {
+    /// If a session already exists for this ball, it is replaced.
+    pub async fn start_rail(&self, ball_id: Option<String>) {
         {
             let engine_guard = self.state.game_engine.lock().await;
             if engine_guard.is_none() {
@@ -258,34 +258,29 @@ impl<'a> GameService<'a> {
             }
         }
 
-        let key = RailSessionKey { is_ramp, ball_id: ball_id.clone() };
+        let key = RailSessionKey { ball_id: ball_id.clone() };
         let (tx, rx) = tokio::sync::oneshot::channel();
 
         self.state.active_rail_sessions.lock().await.insert(key, tx);
 
-        tokio::spawn(rail_ticker_task(self.state.clone(), ball_id, is_ramp, rx));
+        tokio::spawn(rail_ticker_task(self.state.clone(), ball_id, rx));
     }
 
-    /// Stop the rail/ramp scoring session for `ball_id`.
-    pub async fn end_rail(&self, ball_id: Option<String>, is_ramp: bool) {
-        let key = RailSessionKey { is_ramp, ball_id };
+    /// Stop the rail scoring session for `ball_id`.
+    pub async fn end_rail(&self, ball_id: Option<String>) {
+        let key = RailSessionKey { ball_id };
         self.state.active_rail_sessions.lock().await.remove(&key);
         // Dropping the sender cancels the corresponding task.
     }
 
-    /// Process a single rail/ramp tick against the engine.
+    /// Process a single rail tick against the engine.
     /// Called exclusively by the internal `rail_ticker_task`.
     pub async fn process_rail_tick(
         &self,
         ball_id: Option<String>,
         fib_step: u32,
-        is_ramp: bool,
     ) -> Result<(), GameServiceError> {
-        let event = if is_ramp {
-            GameEvent::RampTick { ball_id, fib_step }
-        } else {
-            GameEvent::RailTick { ball_id, fib_step }
-        };
+        let event = GameEvent::RailTick { ball_id, fib_step };
 
         let mut engine_guard = self.state.game_engine.lock().await;
         let mut session_guard = self.state.active_session.lock().await;
@@ -326,12 +321,11 @@ impl<'a> GameService<'a> {
     }
 }
 
-/// Spawned per rail/ramp session. Ticks the engine every `RAIL_TICK_INTERVAL_MS` ms
+/// Spawned per rail session. Ticks the engine every `RAIL_TICK_INTERVAL_MS` ms
 /// with an incrementing Fibonacci step until the oneshot cancel fires (sender dropped).
 async fn rail_ticker_task(
     state: AppState,
     ball_id: Option<String>,
-    is_ramp: bool,
     cancel: tokio::sync::oneshot::Receiver<()>,
 ) {
     tokio::pin!(cancel);
@@ -343,7 +337,7 @@ async fn rail_ticker_task(
             _ = &mut cancel => break,
             _ = tokio::time::sleep(Duration::from_millis(RAIL_TICK_INTERVAL_MS)) => {
                 if GameService::new(&state)
-                    .process_rail_tick(ball_id.clone(), fib_step, is_ramp)
+                    .process_rail_tick(ball_id.clone(), fib_step)
                     .await
                     .is_err()
                 {

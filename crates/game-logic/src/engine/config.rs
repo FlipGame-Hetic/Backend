@@ -120,10 +120,9 @@ pub const STREAK_TIER_1_MULTIPLIER: f32 = 1.5;
 pub const STREAK_TIER_2_MULTIPLIER: f32 = 2.0;
 pub const STREAK_TIER_3_MULTIPLIER: f32 = 3.0;
 
-// Rail / Ramp scoring
+// Rail scoring
 pub const RAIL_TICK_INTERVAL_MS: u64 = 100;
 pub const RAIL_BASE_SCORE: u32 = 50;
-pub const RAMP_BASE_SCORE: u32 = 75;
 /// Fibonacci step is capped so the score per tick doesn't blow up.
 pub const RAIL_MAX_FIB_STEP: u32 = 10;
 

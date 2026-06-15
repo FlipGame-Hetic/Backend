@@ -75,9 +75,4 @@ pub enum GameEvent {
         ball_id: Option<String>,
         fib_step: u32,
     },
-    /// Internal tick emitted by the API-layer ramp ticker task.
-    RampTick {
-        ball_id: Option<String>,
-        fib_step: u32,
-    },
 }

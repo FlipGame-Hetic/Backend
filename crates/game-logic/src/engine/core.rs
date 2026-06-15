@@ -8,8 +8,7 @@ use crate::engine::config::{DEFAULT_LIVES, ULTIME_CHARGE_RATIO};
 use crate::engine::events::{ButtonSide, GameEvent, GameOverReason};
 use crate::engine::pve::PveEngine;
 use crate::engine::scoring::{
-    apply_tilt_penalty, rail_tick_score, ramp_tick_score, score_bumper, score_bumper_triangle,
-    timer_bonus,
+    apply_tilt_penalty, rail_tick_score, score_bumper, score_bumper_triangle, timer_bonus,
 };
 use crate::engine::states::{GamePhase, GameState, TiltEffect};
 use crate::player::personnages::character::{Character, select_character};
@@ -384,20 +383,6 @@ impl GameEngine {
                 envelopes.push(self.emit_score_update());
             }
 
-            GameEvent::RampTick { ball_id, fib_step } => {
-                if self.state.phase != GamePhase::InGame {
-                    return envelopes;
-                }
-                let streak_changed = self.streak.record(now);
-                let current_multiplier = self.effective_multiplier(now);
-                let scored = ramp_tick_score(fib_step, current_multiplier);
-                self.state.add_score(scored);
-                if streak_changed {
-                    envelopes.push(self.emit_multiplier_update(now));
-                }
-                envelopes.push(self.emit_scored_delta(scored, "ramp", ball_id));
-                envelopes.push(self.emit_score_update());
-            }
         }
 
         envelopes
@@ -577,27 +562,7 @@ mod tests {
         );
     }
 
-    #[test]
-    fn ramp_tick_increases_score_more_than_rail() {
-        let mut engine_rail = started_engine();
-        engine_rail.process(GameEvent::RailTick {
-            ball_id: None,
-            fib_step: 0,
-        });
-        let rail_score = engine_rail.state.score;
 
-        let mut engine_ramp = started_engine();
-        engine_ramp.process(GameEvent::RampTick {
-            ball_id: None,
-            fib_step: 0,
-        });
-        let ramp_score = engine_ramp.state.score;
-
-        assert!(
-            ramp_score > rail_score,
-            "ramp base score should be higher than rail"
-        );
-    }
 
     #[test]
     fn rail_tick_fibonacci_progression() {
