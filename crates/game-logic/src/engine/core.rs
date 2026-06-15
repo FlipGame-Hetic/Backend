@@ -35,6 +35,21 @@ impl GameEngine {
         }
     }
 
+    pub fn take_snapshot(&self) -> crate::GameSnapshot {
+        let now = Instant::now();
+        let max_hp = self.pve_engine.boss_max_hp();
+        let boss_hp_percent = if max_hp > 0 {
+            Some(self.pve_engine.boss_hp() as f32 / max_hp as f32)
+        } else {
+            None
+        };
+        crate::GameSnapshot {
+            state: self.state.clone(),
+            current_multiplier: self.multiplier.current(now),
+            boss_hp_percent,
+        }
+    }
+
     pub fn handle_inbound(&mut self, msg: &InboundMessage) -> Vec<ScreenEnvelope> {
         match msg {
             InboundMessage::Button(btn) if btn.state > 0 => {

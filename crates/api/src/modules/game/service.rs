@@ -45,7 +45,7 @@ pub struct GameService<'a> {
 /// path, the engine existed without a corresponding session (corrupt state).
 struct EngineResult {
     envelopes: Vec<ScreenEnvelope>,
-    state_snapshot: game_logic::GameState,
+    state_snapshot: game_logic::GameSnapshot,
     session_snapshot: Option<GameSession>,
     game_over: bool,
 }
@@ -78,7 +78,7 @@ impl<'a> GameService<'a> {
         }
 
         let game_over = envelopes.iter().any(|e| e.event_type == ScreenEventType::GameOver);
-        let state_snapshot = engine.state.clone();
+        let state_snapshot = engine.take_snapshot();
 
         let session_snapshot = if game_over {
             *engine_guard = None;
@@ -105,7 +105,7 @@ impl<'a> GameService<'a> {
         }
 
         if let Some(id) = device_id {
-            sync_game_state_to_bridge(&result.state_snapshot, &self.state.hub, &id);
+            sync_game_state_to_bridge(&result.state_snapshot.state, &self.state.hub, &id);
         }
 
         if result.game_over {
@@ -114,7 +114,7 @@ impl<'a> GameService<'a> {
                     let req = SaveScoreRequest {
                         player_id: session.player_id,
                         character_id: session.character_id,
-                        score: result.state_snapshot.score,
+                        score: result.state_snapshot.state.score,
                         boss_reached: session.boss_reached,
                     };
                     score_service::save_score(&self.state.db_pool, req)
@@ -136,7 +136,7 @@ impl<'a> GameService<'a> {
         &self,
         player_id: String,
         character_id: u8,
-    ) -> Result<game_logic::GameState, GameServiceError> {
+    ) -> Result<game_logic::GameSnapshot, GameServiceError> {
         // Lock order: engine FIRST, session SECOND [§ 4.4]
         let mut engine_guard = self.state.game_engine.lock().await;
         let mut session_guard = self.state.active_session.lock().await;
@@ -149,7 +149,7 @@ impl<'a> GameService<'a> {
         let envelopes = engine.process(game_logic::GameEvent::StartGame {
             player_id: player_id.clone(),
         });
-        let state_snapshot = engine.state.clone();
+        let state_snapshot = engine.take_snapshot();
 
         *engine_guard = Some(engine);
         *session_guard = Some(GameSession {
@@ -172,7 +172,7 @@ impl<'a> GameService<'a> {
         }
 
         if let Some(id) = device_id {
-            sync_game_state_to_bridge(&state_snapshot, &self.state.hub, &id);
+            sync_game_state_to_bridge(&state_snapshot.state, &self.state.hub, &id);
         }
 
         Ok(state_snapshot)
@@ -180,7 +180,7 @@ impl<'a> GameService<'a> {
 
     /// Force-end the current game and persist the final score.
     /// Fails with `NotInProgress` if no session is active.
-    pub async fn end(&self) -> Result<game_logic::GameState, GameServiceError> {
+    pub async fn end(&self) -> Result<game_logic::GameSnapshot, GameServiceError> {
         // Lock order: engine FIRST, session SECOND [§ 4.4]
         let mut engine_guard = self.state.game_engine.lock().await;
         let mut session_guard = self.state.active_session.lock().await;
@@ -193,7 +193,7 @@ impl<'a> GameService<'a> {
         };
 
         let envelopes = engine.process(game_logic::GameEvent::EndGame);
-        let state_snapshot = engine.state.clone();
+        let state_snapshot = engine.take_snapshot();
         let session_snapshot = session_guard.take();
 
         *engine_guard = None;
@@ -210,7 +210,7 @@ impl<'a> GameService<'a> {
             let req = SaveScoreRequest {
                 player_id: session.player_id,
                 character_id: session.character_id,
-                score: state_snapshot.score,
+                score: state_snapshot.state.score,
                 boss_reached: session.boss_reached,
             };
             score_service::save_score(&self.state.db_pool, req)

@@ -53,7 +53,7 @@ pub async fn game_state(State(state): State<AppState>) -> Result<impl IntoRespon
         return Err(ApiError::NotFound("no_game_in_progress".to_owned()));
     };
 
-    let snapshot = engine.state.clone();
+    let snapshot = engine.take_snapshot();
     drop(engine_guard);
 
     Ok((
