@@ -44,7 +44,10 @@ impl GameEngine {
     fn emit_multiplier_update(&self, now: Instant) -> ScreenEnvelope {
         make_event_envelope(
             ScreenEventType::MultiplierUpdate,
-            serde_json::json!({ "multiplier": self.effective_multiplier(now) }),
+            serde_json::json!({
+                "multiplier": self.effective_multiplier(now),
+                "duration_ms": crate::engine::config::STREAK_WINDOW_MS,
+            }),
         )
     }
 
@@ -245,7 +248,7 @@ impl GameEngine {
                     return envelopes;
                 }
                 let bid = ball_id.clone();
-                let streak_changed = self.streak.record(now);
+                let (_streak_changed, streak_armed) = self.streak.record(now);
                 let current_multiplier = self.effective_multiplier(now);
                 let scored = match &event {
                     GameEvent::BumperHit { .. } => score_bumper(current_multiplier),
@@ -263,7 +266,7 @@ impl GameEngine {
                     envelopes.extend(self.process(e));
                 }
 
-                if streak_changed {
+                if streak_armed {
                     envelopes.push(self.emit_multiplier_update(now));
                 }
                 envelopes.extend(self.check_timer_bonus(now));
@@ -280,10 +283,10 @@ impl GameEngine {
 
             GameEvent::PortalUsed { ref ball_id } => {
                 let bid = ball_id.clone();
-                let streak_changed = self.streak.record(now);
+                let (_streak_changed, streak_armed) = self.streak.record(now);
                 let pts = crate::engine::scoring::score_portal_bonus();
                 self.state.add_score(pts);
-                if streak_changed {
+                if streak_armed {
                     envelopes.push(self.emit_multiplier_update(now));
                 }
                 envelopes.push(self.emit_scored_delta(pts, "portal", bid.clone()));
@@ -294,10 +297,10 @@ impl GameEngine {
                 if self.state.phase != GamePhase::InGame {
                     return envelopes;
                 }
-                let streak_changed = self.streak.record(now);
+                let (_streak_changed, streak_armed) = self.streak.record(now);
                 let pts = crate::engine::config::BALL_SAVER_SCORE as u64;
                 self.state.add_score(pts);
-                if streak_changed {
+                if streak_armed {
                     envelopes.push(self.emit_multiplier_update(now));
                 }
                 envelopes.push(self.emit_score_delta(pts, "ball_saver"));
@@ -336,10 +339,10 @@ impl GameEngine {
             }
 
             GameEvent::MultiballWin => {
-                let streak_changed = self.streak.record(now);
+                let (_streak_changed, streak_armed) = self.streak.record(now);
                 let pts = crate::engine::config::MULTIBALL_SCORE as u64;
                 self.state.add_score(pts);
-                if streak_changed {
+                if streak_armed {
                     envelopes.push(self.emit_multiplier_update(now));
                 }
                 envelopes.push(self.emit_score_delta(pts, "multiball"));
@@ -364,12 +367,12 @@ impl GameEngine {
             }
 
             GameEvent::ComboActivated(effect) => {
-                let streak_changed = self.streak.record(now);
+                let (_streak_changed, streak_armed) = self.streak.record(now);
                 let current_multiplier = self.effective_multiplier(now);
                 let scaled_bonus = (effect.bonus_pts as f32 * current_multiplier) as u64;
                 self.state.add_score(scaled_bonus);
                 envelopes.push(self.emit_combo_activated(&effect));
-                if streak_changed {
+                if streak_armed {
                     envelopes.push(self.emit_multiplier_update(now));
                 }
                 envelopes.push(self.emit_score_delta(scaled_bonus, "combo"));
@@ -399,11 +402,11 @@ impl GameEngine {
                     return envelopes;
                 }
                 let bid = ball_id.clone();
-                let streak_changed = self.streak.record(now);
+                let (_streak_changed, streak_armed) = self.streak.record(now);
                 let current_multiplier = self.effective_multiplier(now);
                 let scored = rail_tick_score(fib_step, current_multiplier);
                 self.state.add_score(scored);
-                if streak_changed {
+                if streak_armed {
                     envelopes.push(self.emit_multiplier_update(now));
                 }
                 envelopes.push(self.emit_scored_delta(scored, "rail", ball_id));
