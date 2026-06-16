@@ -39,60 +39,24 @@ pub const COMBO_DETECTION_WINDOW_MS: u64 = 2_000;
 pub const COMBO_PENALTY_REPEAT: usize = 7;
 pub const COMBO_PENALTY_PTS: i64 = 2_000;
 
-// Combo stats: (bonus_pts, multiplier, duration_ms)
+// Combo stats: bonus_pts only (combos grant points, not a score multiplier)
 pub const COMBO_2_BONUS: u32 = 0;
-pub const COMBO_2_MULTIPLIER: f32 = 1.5;
-pub const COMBO_2_DURATION_MS: u64 = 1_500;
-
 pub const COMBO_3_BONUS: u32 = 0;
-pub const COMBO_3_MULTIPLIER: f32 = 2.0;
-pub const COMBO_3_DURATION_MS: u64 = 2_000;
-
 pub const COMBO_4_BONUS: u32 = 2_000;
-pub const COMBO_4_MULTIPLIER: f32 = 1.5;
-pub const COMBO_4_DURATION_MS: u64 = 2_000;
-
 pub const COMBO_5_BONUS: u32 = 2_000;
-pub const COMBO_5_MULTIPLIER: f32 = 1.5;
-pub const COMBO_5_DURATION_MS: u64 = 2_000;
-
 pub const COMBO_6_BONUS: u32 = 4_000;
-pub const COMBO_6_MULTIPLIER: f32 = 2.0;
-pub const COMBO_6_DURATION_MS: u64 = 1_000;
-
 pub const COMBO_7_BONUS: u32 = 4_550;
-pub const COMBO_7_MULTIPLIER: f32 = 3.0;
-pub const COMBO_7_DURATION_MS: u64 = 500;
-
 pub const COMBO_8_BONUS: u32 = 1_500;
-pub const COMBO_8_MULTIPLIER: f32 = 1.5;
-pub const COMBO_8_DURATION_MS: u64 = 3_000;
 
 // Hard 6-button combos
 pub const COMBO_9_BONUS: u32 = 3_250;
-pub const COMBO_9_MULTIPLIER: f32 = 2.5;
-pub const COMBO_9_DURATION_MS: u64 = 2_500;
-
 pub const COMBO_10_BONUS: u32 = 3_000;
-pub const COMBO_10_MULTIPLIER: f32 = 2.5;
-pub const COMBO_10_DURATION_MS: u64 = 2_500;
-
 pub const COMBO_11_BONUS: u32 = 2_500;
-pub const COMBO_11_MULTIPLIER: f32 = 2.5;
-pub const COMBO_11_DURATION_MS: u64 = 2_000;
 
 // Very hard 7-button combos
 pub const COMBO_14_BONUS: u32 = 6_000;
-pub const COMBO_14_MULTIPLIER: f32 = 3.5;
-pub const COMBO_14_DURATION_MS: u64 = 3_000;
-
 pub const COMBO_15_BONUS: u32 = 6_500;
-pub const COMBO_15_MULTIPLIER: f32 = 3.5;
-pub const COMBO_15_DURATION_MS: u64 = 3_000;
-
 pub const COMBO_16_BONUS: u32 = 7_250;
-pub const COMBO_16_MULTIPLIER: f32 = 3.0;
-pub const COMBO_16_DURATION_MS: u64 = 2_000;
 
 // Character stats
 pub const ROBOCP_ULTIMATE_MAX: u32 = 500;
@@ -122,10 +86,10 @@ pub const STREAK_TIER_3_MULTIPLIER: f32 = 3.0;
 
 // Rail
 pub const RAIL_TICK_INTERVAL_MS: u64 = 100;
-pub const RAIL_BASE_SCORE: u32 = 10;
+pub const RAIL_BASE_SCORE: u32 = 4;
 /// Fibonacci step is capped so the score per tick doesn't blow up.
 /// fib(10) = 89 → 890 pts/tick at ×1 multiplier, which is a sane ceiling.
-pub const RAIL_MAX_FIB_STEP: u32 = 10;
+pub const RAIL_MAX_FIB_STEP: u32 = 7;
 
 // Skill effects
 pub const SKILL_SHIELD_DURATION_MS: u64 = 8_000;

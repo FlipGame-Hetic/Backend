@@ -3,16 +3,10 @@ use std::time::Instant;
 
 use crate::combo::model::{ButtonPress, ComboDefinition, ComboEffect, ComboResult};
 use crate::engine::config::{
-    COMBO_2_BONUS, COMBO_2_DURATION_MS, COMBO_2_MULTIPLIER, COMBO_3_BONUS, COMBO_3_DURATION_MS,
-    COMBO_3_MULTIPLIER, COMBO_4_BONUS, COMBO_4_DURATION_MS, COMBO_4_MULTIPLIER, COMBO_5_BONUS,
-    COMBO_5_DURATION_MS, COMBO_5_MULTIPLIER, COMBO_6_BONUS, COMBO_6_DURATION_MS,
-    COMBO_6_MULTIPLIER, COMBO_7_BONUS, COMBO_7_DURATION_MS, COMBO_7_MULTIPLIER, COMBO_8_BONUS,
-    COMBO_8_DURATION_MS, COMBO_8_MULTIPLIER, COMBO_9_BONUS, COMBO_9_DURATION_MS,
-    COMBO_9_MULTIPLIER, COMBO_10_BONUS, COMBO_10_DURATION_MS, COMBO_10_MULTIPLIER, COMBO_11_BONUS,
-    COMBO_11_DURATION_MS, COMBO_11_MULTIPLIER, COMBO_14_BONUS, COMBO_14_DURATION_MS,
-    COMBO_14_MULTIPLIER, COMBO_15_BONUS, COMBO_15_DURATION_MS, COMBO_15_MULTIPLIER, COMBO_16_BONUS,
-    COMBO_16_DURATION_MS, COMBO_16_MULTIPLIER, COMBO_BUFFER_MAX, COMBO_DETECTION_WINDOW_MS,
-    COMBO_PENALTY_PTS, COMBO_PENALTY_REPEAT,
+    COMBO_2_BONUS, COMBO_3_BONUS, COMBO_4_BONUS, COMBO_5_BONUS, COMBO_6_BONUS, COMBO_7_BONUS,
+    COMBO_8_BONUS, COMBO_9_BONUS, COMBO_10_BONUS, COMBO_11_BONUS, COMBO_14_BONUS, COMBO_15_BONUS,
+    COMBO_16_BONUS, COMBO_BUFFER_MAX, COMBO_DETECTION_WINDOW_MS, COMBO_PENALTY_PTS,
+    COMBO_PENALTY_REPEAT,
 };
 
 fn combo_table() -> Vec<ComboDefinition> {
@@ -25,24 +19,18 @@ fn combo_table() -> Vec<ComboDefinition> {
             sequence: vec![D, G, D, G, D, G, D],
             max_duration_ms: COMBO_DETECTION_WINDOW_MS,
             bonus_pts: COMBO_14_BONUS,
-            multiplier: COMBO_14_MULTIPLIER,
-            duration_ms: COMBO_14_DURATION_MS,
         },
         ComboDefinition {
             id: 15,
             sequence: vec![G, D, G, D, G, D, G],
             max_duration_ms: COMBO_DETECTION_WINDOW_MS,
             bonus_pts: COMBO_15_BONUS,
-            multiplier: COMBO_15_MULTIPLIER,
-            duration_ms: COMBO_15_DURATION_MS,
         },
         ComboDefinition {
             id: 16,
             sequence: vec![D, D, G, D, G, G, D],
             max_duration_ms: COMBO_DETECTION_WINDOW_MS,
             bonus_pts: COMBO_16_BONUS,
-            multiplier: COMBO_16_MULTIPLIER,
-            duration_ms: COMBO_16_DURATION_MS,
         },
         // Standard 7-button combos
         ComboDefinition {
@@ -50,24 +38,18 @@ fn combo_table() -> Vec<ComboDefinition> {
             sequence: vec![G, G, D, D, G, G, D],
             max_duration_ms: COMBO_DETECTION_WINDOW_MS,
             bonus_pts: COMBO_6_BONUS,
-            multiplier: COMBO_6_MULTIPLIER,
-            duration_ms: COMBO_6_DURATION_MS,
         },
         ComboDefinition {
             id: 7,
             sequence: vec![G, G, D, G, D, G, G],
             max_duration_ms: COMBO_DETECTION_WINDOW_MS,
             bonus_pts: COMBO_7_BONUS,
-            multiplier: COMBO_7_MULTIPLIER,
-            duration_ms: COMBO_7_DURATION_MS,
         },
         ComboDefinition {
             id: 8,
             sequence: vec![D, D, D, G, G, D, G],
             max_duration_ms: COMBO_DETECTION_WINDOW_MS,
             bonus_pts: COMBO_8_BONUS,
-            multiplier: COMBO_8_MULTIPLIER,
-            duration_ms: COMBO_8_DURATION_MS,
         },
         // 6-button combos
         // Hard: alternating patterns
@@ -76,24 +58,18 @@ fn combo_table() -> Vec<ComboDefinition> {
             sequence: vec![D, G, D, G, D, D],
             max_duration_ms: COMBO_DETECTION_WINDOW_MS,
             bonus_pts: COMBO_9_BONUS,
-            multiplier: COMBO_9_MULTIPLIER,
-            duration_ms: COMBO_9_DURATION_MS,
         },
         ComboDefinition {
             id: 10,
             sequence: vec![G, G, D, G, D, D],
             max_duration_ms: COMBO_DETECTION_WINDOW_MS,
             bonus_pts: COMBO_10_BONUS,
-            multiplier: COMBO_10_MULTIPLIER,
-            duration_ms: COMBO_10_DURATION_MS,
         },
         ComboDefinition {
             id: 11,
             sequence: vec![D, G, G, D, G, D],
             max_duration_ms: COMBO_DETECTION_WINDOW_MS,
             bonus_pts: COMBO_11_BONUS,
-            multiplier: COMBO_11_MULTIPLIER,
-            duration_ms: COMBO_11_DURATION_MS,
         },
         // Standard 6-button combos
         ComboDefinition {
@@ -101,24 +77,18 @@ fn combo_table() -> Vec<ComboDefinition> {
             sequence: vec![G, G, D, D, D, D],
             max_duration_ms: COMBO_DETECTION_WINDOW_MS,
             bonus_pts: COMBO_3_BONUS,
-            multiplier: COMBO_3_MULTIPLIER,
-            duration_ms: COMBO_3_DURATION_MS,
         },
         ComboDefinition {
             id: 4,
             sequence: vec![G, G, D, D, D, G],
             max_duration_ms: COMBO_DETECTION_WINDOW_MS,
             bonus_pts: COMBO_4_BONUS,
-            multiplier: COMBO_4_MULTIPLIER,
-            duration_ms: COMBO_4_DURATION_MS,
         },
         ComboDefinition {
             id: 5,
             sequence: vec![G, G, D, G, G, D],
             max_duration_ms: COMBO_DETECTION_WINDOW_MS,
             bonus_pts: COMBO_5_BONUS,
-            multiplier: COMBO_5_MULTIPLIER,
-            duration_ms: COMBO_5_DURATION_MS,
         },
         // 5-button combos
         ComboDefinition {
@@ -126,8 +96,6 @@ fn combo_table() -> Vec<ComboDefinition> {
             sequence: vec![G, G, D, D, G],
             max_duration_ms: COMBO_DETECTION_WINDOW_MS,
             bonus_pts: COMBO_2_BONUS,
-            multiplier: COMBO_2_MULTIPLIER,
-            duration_ms: COMBO_2_DURATION_MS,
         },
     ]
 }
@@ -187,8 +155,6 @@ impl ComboDetector {
                 return ComboResult::Activated(ComboEffect {
                     combo_id: combo.id,
                     bonus_pts: combo.bonus_pts,
-                    multiplier: combo.multiplier,
-                    duration_ms: combo.duration_ms,
                 });
             }
         }

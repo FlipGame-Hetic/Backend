@@ -12,16 +12,12 @@ pub struct ComboDefinition {
     pub sequence: Vec<ButtonPress>,
     pub max_duration_ms: u64,
     pub bonus_pts: u32,
-    pub multiplier: f32,
-    pub duration_ms: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ComboEffect {
     pub combo_id: u8,
     pub bonus_pts: u32,
-    pub multiplier: f32,
-    pub duration_ms: u64,
 }
 
 #[derive(Debug, Clone)]

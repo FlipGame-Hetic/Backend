@@ -450,13 +450,7 @@ impl GameEngine {
                 duration_ms,
             } => {
                 let now = Instant::now();
-                let combo_effect = crate::combo::ComboEffect {
-                    combo_id: 0,
-                    bonus_pts: 0,
-                    multiplier: factor,
-                    duration_ms,
-                };
-                self.multiplier.apply(&combo_effect, now);
+                self.multiplier.apply(factor, duration_ms, now);
                 vec![make_event_envelope(
                     ScreenEventType::MultiplierUpdate,
                     serde_json::json!({ "multiplier": self.effective_multiplier(now), "duration_ms": duration_ms }),
@@ -534,8 +528,6 @@ impl GameEngine {
             serde_json::json!({
                 "combo_id": effect.combo_id,
                 "bonus_pts": effect.bonus_pts,
-                "multiplier": effect.multiplier,
-                "duration_ms": effect.duration_ms,
             }),
         )
     }

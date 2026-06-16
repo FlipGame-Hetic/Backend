@@ -1,7 +1,5 @@
 use std::time::{Duration, Instant};
 
-use crate::combo::model::ComboEffect;
-
 pub struct MultiplierState {
     active: Option<(f32, Instant, Duration)>,
 }
@@ -11,12 +9,8 @@ impl MultiplierState {
         Self { active: None }
     }
 
-    pub fn apply(&mut self, effect: &ComboEffect, now: Instant) {
-        self.active = Some((
-            effect.multiplier,
-            now,
-            Duration::from_millis(effect.duration_ms),
-        ));
+    pub fn apply(&mut self, factor: f32, duration_ms: u64, now: Instant) {
+        self.active = Some((factor, now, Duration::from_millis(duration_ms)));
     }
 
     pub fn current(&self, now: Instant) -> f32 {
@@ -50,13 +44,7 @@ mod tests {
     fn test_multiplier_active() {
         let mut ms = MultiplierState::new();
         let now = Instant::now();
-        let effect = ComboEffect {
-            combo_id: 1,
-            bonus_pts: 0,
-            multiplier: 2.0,
-            duration_ms: 5_000,
-        };
-        ms.apply(&effect, now);
+        ms.apply(2.0, 5_000, now);
         assert!((ms.current(now) - 2.0).abs() < f32::EPSILON);
         assert!(!ms.is_expired(now));
     }
@@ -65,13 +53,7 @@ mod tests {
     fn test_multiplier_expires() {
         let mut ms = MultiplierState::new();
         let past = Instant::now() - Duration::from_millis(6_000);
-        let effect = ComboEffect {
-            combo_id: 1,
-            bonus_pts: 0,
-            multiplier: 2.0,
-            duration_ms: 1_000,
-        };
-        ms.apply(&effect, past);
+        ms.apply(2.0, 1_000, past);
         assert!((ms.current(Instant::now()) - 1.0).abs() < f32::EPSILON);
         assert!(ms.is_expired(Instant::now()));
     }
