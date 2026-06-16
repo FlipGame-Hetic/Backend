@@ -42,21 +42,21 @@ pub const COMBO_PENALTY_PTS: i64 = 2_000;
 // Combo stats: bonus_pts only (combos grant points, not a score multiplier)
 pub const COMBO_2_BONUS: u32 = 0;
 pub const COMBO_3_BONUS: u32 = 0;
-pub const COMBO_4_BONUS: u32 = 2_000;
+pub const COMBO_4_BONUS: u32 = 1_000;
 pub const COMBO_5_BONUS: u32 = 2_000;
-pub const COMBO_6_BONUS: u32 = 4_000;
-pub const COMBO_7_BONUS: u32 = 4_550;
-pub const COMBO_8_BONUS: u32 = 1_500;
+pub const COMBO_6_BONUS: u32 = 2_000;
+pub const COMBO_7_BONUS: u32 = 2_000;
+pub const COMBO_8_BONUS: u32 = 2_000;
 
 // Hard 6-button combos
-pub const COMBO_9_BONUS: u32 = 3_250;
-pub const COMBO_10_BONUS: u32 = 3_000;
-pub const COMBO_11_BONUS: u32 = 2_500;
+pub const COMBO_9_BONUS: u32 = 1_500;
+pub const COMBO_10_BONUS: u32 = 1_500;
+pub const COMBO_11_BONUS: u32 = 1_550;
 
 // Very hard 7-button combos
-pub const COMBO_14_BONUS: u32 = 6_000;
-pub const COMBO_15_BONUS: u32 = 6_500;
-pub const COMBO_16_BONUS: u32 = 7_250;
+pub const COMBO_14_BONUS: u32 = 2_000;
+pub const COMBO_15_BONUS: u32 = 2_000;
+pub const COMBO_16_BONUS: u32 = 2_000;
 
 // Character stats
 pub const ROBOCP_ULTIMATE_MAX: u32 = 500;
