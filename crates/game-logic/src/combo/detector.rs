@@ -22,7 +22,7 @@ fn combo_table() -> Vec<ComboDefinition> {
         },
         ComboDefinition {
             id: 15,
-            sequence: vec![G, D, G, D, G, D, G],
+            sequence: vec![G, G, D, G, D, D, G],
             max_duration_ms: COMBO_DETECTION_WINDOW_MS,
             bonus_pts: COMBO_15_BONUS,
         },
