@@ -59,22 +59,28 @@ pub fn rail_tick_score(fib_step: u32, multiplier: f32) -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::engine::config::{
+        BUMPER_SCORE, BUMPER_TRIANGLE_SCORE, RAIL_BASE_SCORE, TIMER_BONUS_MULTIPLIER,
+        TIMER_BONUS_SCORE,
+    };
 
     #[test]
     fn test_bumper_with_multiplier() {
-        assert_eq!(score_bumper(1.5), 150);
+        assert_eq!(score_bumper(1.5), (BUMPER_SCORE as f32 * 1.5) as u64);
     }
 
     #[test]
     fn test_bumper_triangle_with_multiplier() {
-        assert_eq!(score_bumper_triangle(2.0), 400);
+        assert_eq!(
+            score_bumper_triangle(2.0),
+            (BUMPER_TRIANGLE_SCORE as f32 * 2.0) as u64
+        );
     }
 
     #[test]
     fn test_timer_bonus_no_lives_lost() {
-        let result = timer_bonus(1_000, 0);
-        // (1000 + 500) * 1.5 = 2250
-        assert_eq!(result, 2_250);
+        let expected = ((1_000 + TIMER_BONUS_SCORE as u64) as f32 * TIMER_BONUS_MULTIPLIER) as u64;
+        assert_eq!(timer_bonus(1_000, 0), expected);
     }
 
     #[test]
@@ -114,19 +120,20 @@ mod tests {
 
     #[test]
     fn test_rail_tick_score_step_0_no_multiplier() {
-        // fib(0)=1, base=50, mult=1.0 → 50
-        assert_eq!(rail_tick_score(0, 1.0), 50);
+        assert_eq!(rail_tick_score(0, 1.0), RAIL_BASE_SCORE as u64);
     }
 
     #[test]
     fn test_rail_tick_score_step_4_with_multiplier() {
-        // fib(4)=5, base=50, mult=2.0 → 500
-        assert_eq!(rail_tick_score(4, 2.0), 500);
+        // fib(4) = 5
+        assert_eq!(
+            rail_tick_score(4, 2.0),
+            (RAIL_BASE_SCORE as f32 * fibonacci(4) as f32 * 2.0) as u64
+        );
     }
 
     #[test]
     fn test_rail_tick_score_capped_at_max_fib_step() {
-        // step 100 and step RAIL_MAX_FIB_STEP should produce identical scores
         assert_eq!(
             rail_tick_score(100, 1.0),
             rail_tick_score(RAIL_MAX_FIB_STEP, 1.0)

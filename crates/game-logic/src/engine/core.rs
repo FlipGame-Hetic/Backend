@@ -599,40 +599,26 @@ mod tests {
 
     #[test]
     fn rail_tick_fibonacci_progression() {
-        let mut engine = started_engine();
-        let s0 = {
+        let delta_at = |fib_step: u32| {
+            let mut engine = started_engine();
+            let before = engine.state.score;
             engine.process(GameEvent::RailTick {
                 ball_id: None,
-                fib_step: 0,
+                fib_step,
             });
-            engine.state.score
+            engine.state.score - before
         };
-        let s1 = {
-            engine.process(GameEvent::RailTick {
-                ball_id: None,
-                fib_step: 1,
-            });
-            engine.state.score
-        };
-        let s2 = {
-            engine.process(GameEvent::RailTick {
-                ball_id: None,
-                fib_step: 2,
-            });
-            engine.state.score
-        };
-        // Delta at step 0 and 1 are equal (fib(0)=fib(1)=1), step 2 is larger.
-        let d0 = s1 - s0;
-        let d1 = s2 - s1; // d1 is actually delta for fib_step=2 (fib=2), not fib_step=1 (fib=1)
-        // Wait, engine score is cumulative, so:
-        // s0 = fib(0)*base, d0 = s1-s0 = fib(1)*base, d1 = s2-s1 = fib(2)*base
-        // fib(0)=1, fib(1)=1, fib(2)=2 → d0 == d0_expected and d1 > d0
+
+        let d0 = delta_at(0);
+        let d1 = delta_at(1);
+        let d2 = delta_at(2);
+
         assert_eq!(
-            d0, s0,
+            d0, d1,
             "fib(0)==fib(1) so step-0 and step-1 deltas should be equal"
         );
         assert!(
-            d1 > d0,
+            d2 > d1,
             "step-2 delta should be larger than step-1 (fib grows)"
         );
     }
@@ -703,23 +689,18 @@ mod tests {
 
     #[test]
     fn multiball_two_balls_score_independently() {
-        let mut engine = started_engine();
+        let delta_for = |ball_id: &str| {
+            let mut engine = started_engine();
+            let before = engine.state.score;
+            engine.process(GameEvent::RailTick {
+                ball_id: Some(ball_id.to_string()),
+                fib_step: 3,
+            });
+            engine.state.score - before
+        };
 
-        let score_before = engine.state.score;
-        engine.process(GameEvent::RailTick {
-            ball_id: Some("ball-uuid-1".to_string()),
-            fib_step: 3,
-        });
-        let after_ball1 = engine.state.score;
-        engine.process(GameEvent::RailTick {
-            ball_id: Some("ball-uuid-2".to_string()),
-            fib_step: 3,
-        });
-        let after_ball2 = engine.state.score;
-
-        // Both ticks add score and each delta should be equal (same fib_step + multiplier).
-        let d1 = after_ball1 - score_before;
-        let d2 = after_ball2 - after_ball1;
+        let d1 = delta_for("ball-uuid-1");
+        let d2 = delta_for("ball-uuid-2");
         assert!(d1 > 0);
         assert_eq!(d1, d2, "same fib_step → same delta regardless of ball_id");
     }
