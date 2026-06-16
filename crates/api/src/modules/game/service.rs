@@ -71,10 +71,10 @@ impl<'a> GameService<'a> {
         let envelopes = event_fn(engine);
 
         for env in &envelopes {
-            if env.event_type == ScreenEventType::BossDefeated {
-                if let Some(session) = session_guard.as_mut() {
-                    session.boss_reached = session.boss_reached.saturating_add(1);
-                }
+            if env.event_type == ScreenEventType::BossDefeated
+                && let Some(session) = session_guard.as_mut()
+            {
+                session.boss_reached = session.boss_reached.saturating_add(1);
             }
         }
 
