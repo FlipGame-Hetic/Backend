@@ -402,13 +402,12 @@ impl GameEngine {
                     return envelopes;
                 }
                 let bid = ball_id.clone();
-                let (_streak_changed, streak_armed) = self.streak.record(now);
-                let current_multiplier = self.effective_multiplier(now);
+                // Rail ticks use only the active combo multiplier, not the streak.
+                // Counting each tick as a streak hit would drive the streak tier up
+                // artificially fast and produce exploding scores.
+                let current_multiplier = self.multiplier.current(now);
                 let scored = rail_tick_score(fib_step, current_multiplier);
                 self.state.add_score(scored);
-                if streak_armed {
-                    envelopes.push(self.emit_multiplier_update(now));
-                }
                 envelopes.push(self.emit_scored_delta(scored, "rail", ball_id));
                 envelopes.push(self.emit_score_update(bid));
             }
