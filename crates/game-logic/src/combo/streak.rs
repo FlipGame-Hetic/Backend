@@ -21,7 +21,7 @@ impl StreakState {
     /// Record a scoring event. Returns `true` if the multiplier tier changed.
     pub fn record(&mut self, now: Instant) -> bool {
         let prev_tier = self.tier();
-        let in_window = self.last_at.map_or(false, |t| {
+        let in_window = self.last_at.is_some_and(|t| {
             now.duration_since(t) <= Duration::from_millis(STREAK_WINDOW_MS)
         });
         if in_window {
