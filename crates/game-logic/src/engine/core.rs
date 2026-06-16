@@ -526,8 +526,8 @@ impl GameEngine {
         make_event_envelope(
             ScreenEventType::ComboActivated,
             serde_json::json!({
-                "combo_id": effect.combo_id,
                 "bonus_pts": effect.bonus_pts,
+                "sequence": effect.sequence,
             }),
         )
     }

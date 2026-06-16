@@ -152,9 +152,19 @@ impl ComboDetector {
             let oldest_time = tail[n - 1].1;
             let elapsed = now.duration_since(oldest_time).as_millis() as u64;
             if elapsed <= combo.max_duration_ms {
+                let sequence = combo
+                    .sequence
+                    .iter()
+                    .map(|p| match p {
+                        ButtonPress::Left => "L",
+                        ButtonPress::Right => "R",
+                    })
+                    .map(String::from)
+                    .collect();
                 return ComboResult::Activated(ComboEffect {
                     combo_id: combo.id,
                     bonus_pts: combo.bonus_pts,
+                    sequence,
                 });
             }
         }

@@ -18,6 +18,7 @@ pub struct ComboDefinition {
 pub struct ComboEffect {
     pub combo_id: u8,
     pub bonus_pts: u32,
+    pub sequence: Vec<String>,
 }
 
 #[derive(Debug, Clone)]
