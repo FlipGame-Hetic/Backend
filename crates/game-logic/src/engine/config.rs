@@ -121,7 +121,7 @@ pub const STREAK_TIER_2_MULTIPLIER: f32 = 2.0;
 pub const STREAK_TIER_3_MULTIPLIER: f32 = 3.0;
 
 // Rail
-pub const RAIL_TICK_INTERVAL_MS: u64 = 300;
+pub const RAIL_TICK_INTERVAL_MS: u64 = 100;
 pub const RAIL_BASE_SCORE: u32 = 10;
 /// Fibonacci step is capped so the score per tick doesn't blow up.
 pub const RAIL_MAX_FIB_STEP: u32 = 200;
