@@ -1,3 +1,5 @@
+use shared::screen::ScreenEventType;
+
 use crate::player::skills::player_bonus::SkillEffect;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -23,15 +25,15 @@ impl MalusSkill {
         }
         // PvP: target opponent via screen event
         let event_type = match self {
-            Self::Invisible => "MalusInvisible",
-            Self::InkBlot => "MalusInkBlot",
-            Self::BumperReduction => "MalusBumperReduction",
-            Self::BlackHole => "MalusBlackHole",
-            Self::ModifyBounce => "MalusModifyBounce",
-            Self::StickyBumpers => "MalusStickyBumpers",
+            Self::Invisible => ScreenEventType::MalusInvisible,
+            Self::InkBlot => ScreenEventType::MalusInkBlot,
+            Self::BumperReduction => ScreenEventType::MalusBumperReduction,
+            Self::BlackHole => ScreenEventType::MalusBlackHole,
+            Self::ModifyBounce => ScreenEventType::MalusModifyBounce,
+            Self::StickyBumpers => ScreenEventType::MalusStickyBumpers,
         };
         SkillEffect::EmitScreenEvent {
-            event_type: event_type.to_owned(),
+            event_type,
             payload: serde_json::json!({ "target": "opponent" }),
         }
     }

@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use game_logic::GameEngine;
@@ -6,6 +7,12 @@ use screen_hub::router::ScreenRouter;
 use tokio::sync::Mutex;
 
 use crate::modules::realtime::hub::BridgeHub;
+
+/// Identifies a single rail scoring session, unique per ball.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct RailSessionKey {
+    pub ball_id: Option<String>,
+}
 
 /// Identifies the current player session between StartGame and GameOver.
 #[derive(Debug, Clone)]
@@ -27,6 +34,8 @@ pub struct AppState {
     pub active_session: Arc<Mutex<Option<GameSession>>>,
     pub active_device_id: Arc<tokio::sync::RwLock<Option<String>>>,
     pub db_pool: sqlx::SqlitePool,
+    /// Active rail/ramp ticker sessions. Dropping a sender cancels the associated task.
+    pub active_rail_sessions: Arc<Mutex<HashMap<RailSessionKey, tokio::sync::oneshot::Sender<()>>>>,
 }
 
 impl AppState {
@@ -43,6 +52,7 @@ impl AppState {
             active_session: Arc::new(Mutex::new(None)),
             active_device_id: Arc::new(tokio::sync::RwLock::new(None)),
             db_pool,
+            active_rail_sessions: Arc::new(Mutex::new(HashMap::new())),
         }
     }
 }

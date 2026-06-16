@@ -1,4 +1,4 @@
-use shared::screen::{ScreenEnvelope, ScreenId, ScreenTarget};
+use shared::screen::{ScreenEnvelope, ScreenEventType, ScreenId, ScreenTarget};
 
 use crate::engine::config::BOSS_0_HP;
 use crate::engine::events::{GameEvent, GameOverReason};
@@ -15,7 +15,7 @@ pub struct PveEngine {
 
 impl PveEngine {
     pub fn new() -> Self {
-        let kind = BossKind::GLaDOS;
+        let kind = BossKind::from_index(0).unwrap_or(BossKind::GLaDOS);
         let boss = Boss::new(kind, 0);
         let initial_hp = boss.health.max;
         Self {
@@ -37,8 +37,9 @@ impl PveEngine {
                 self.reset_to_boss(0, &mut envelopes);
             }
 
-            GameEvent::BumperHit { pts } | GameEvent::BumperTriangleHit { pts } => {
-                let damage = boss_damage_to_health(*pts, self.state.current_boss_index);
+            GameEvent::BumperHit { pts, .. } | GameEvent::BumperTriangleHit { pts, .. } => {
+                let base_damage = boss_damage_to_health(*pts, self.state.current_boss_index);
+                let damage = (base_damage as f32 * game_state.damage_multiplier) as u32;
                 let died = self.boss.take_hit(damage);
                 self.state.boss_health.current = self.boss.health.current;
 
@@ -72,7 +73,7 @@ impl PveEngine {
     fn transition_after_defeat(
         &mut self,
         envelopes: &mut Vec<ScreenEnvelope>,
-        _extra_events: &mut Vec<GameEvent>,
+        _extra_events: &mut [GameEvent],
     ) {
         let next_index = self.state.current_boss_index + 1;
 
@@ -84,7 +85,7 @@ impl PveEngine {
             if self.state.endless_level == 1 {
                 self.state.phase = PvePhase::Victory;
                 envelopes.push(make_event_envelope(
-                    "VictoireFinale",
+                    ScreenEventType::VictoireFinale,
                     serde_json::Value::Null,
                 ));
             } else {
@@ -100,7 +101,7 @@ impl PveEngine {
                     self.boss.health.max,
                 ));
                 envelopes.push(make_event_envelope(
-                    "EndlessScaling",
+                    ScreenEventType::EndlessScaling,
                     serde_json::json!({ "level": level }),
                 ));
             }
@@ -152,16 +153,16 @@ impl Default for PveEngine {
 
 fn make_boss_update(boss_id: u8, hp: u32, max_hp: u32) -> ScreenEnvelope {
     make_event_envelope(
-        "BossUpdate",
+        ScreenEventType::BossUpdate,
         serde_json::json!({ "boss_id": boss_id, "boss_hp": hp, "boss_max_hp": max_hp }),
     )
 }
 
-fn make_event_envelope(event_type: &str, payload: serde_json::Value) -> ScreenEnvelope {
+fn make_event_envelope(event_type: ScreenEventType, payload: serde_json::Value) -> ScreenEnvelope {
     ScreenEnvelope {
         from: ScreenId::BackScreen,
         to: ScreenTarget::Broadcast,
-        event_type: event_type.to_owned(),
+        event_type,
         payload,
     }
 }
@@ -182,7 +183,13 @@ mod tests {
         let mut state = make_state();
 
         let hp = pve.boss.health.max;
-        let (_, events) = pve.on_event(&GameEvent::BumperHit { pts: hp }, &mut state);
+        let (_, events) = pve.on_event(
+            &GameEvent::BumperHit {
+                ball_id: None,
+                pts: hp,
+            },
+            &mut state,
+        );
 
         assert!(
             events
@@ -199,7 +206,13 @@ mod tests {
 
         for _ in 0..3 {
             let hp = pve.boss.health.max;
-            pve.on_event(&GameEvent::BumperHit { pts: hp }, &mut state);
+            pve.on_event(
+                &GameEvent::BumperHit {
+                    ball_id: None,
+                    pts: hp,
+                },
+                &mut state,
+            );
         }
 
         assert_eq!(*pve.phase(), PvePhase::Victory);
@@ -218,5 +231,33 @@ mod tests {
                 .iter()
                 .any(|e| matches!(e, GameEvent::GameOverTriggered { .. }))
         );
+    }
+
+    #[test]
+    fn test_damage_multiplier_applied_to_boss() {
+        let mut pve = PveEngine::new();
+        let mut state = make_state();
+        let max_hp = pve.boss.health.max;
+
+        // Hit once without boost — boss should lose exactly `pts` HP
+        pve.on_event(
+            &GameEvent::BumperHit {
+                ball_id: None,
+                pts: 100,
+            },
+            &mut state,
+        );
+        assert_eq!(pve.boss_hp(), max_hp - 100);
+
+        // Activate damage boost (x2)
+        state.damage_multiplier = 2.0;
+        pve.on_event(
+            &GameEvent::BumperHit {
+                ball_id: None,
+                pts: 100,
+            },
+            &mut state,
+        );
+        assert_eq!(pve.boss_hp(), max_hp - 100 - 200);
     }
 }

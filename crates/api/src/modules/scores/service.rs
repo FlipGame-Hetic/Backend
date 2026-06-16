@@ -20,8 +20,7 @@ pub async fn get_leaderboard(
     limit: i64,
 ) -> Result<Vec<ScoreEntry>, sqlx::Error> {
     let rows = sqlx::query(
-        "SELECT id, player_id, character_id, score, boss_reached, \
-         COALESCE(created_at, '') as created_at \
+        "SELECT id, player_id, character_id, score, boss_reached, created_at \
          FROM scores ORDER BY score DESC LIMIT ?",
     )
     .bind(limit)
@@ -36,8 +35,7 @@ pub async fn get_player_scores(
     player_id: &str,
 ) -> Result<Vec<ScoreEntry>, sqlx::Error> {
     let rows = sqlx::query(
-        "SELECT id, player_id, character_id, score, boss_reached, \
-         COALESCE(created_at, '') as created_at \
+        "SELECT id, player_id, character_id, score, boss_reached, created_at \
          FROM scores WHERE player_id = ? ORDER BY score DESC",
     )
     .bind(player_id)
@@ -54,6 +52,6 @@ fn row_to_entry(row: sqlx::sqlite::SqliteRow) -> ScoreEntry {
         character_id: row.get("character_id"),
         score: row.get("score"),
         boss_reached: row.get("boss_reached"),
-        created_at: row.get::<String, _>("created_at"),
+        created_at: row.get::<Option<String>, _>("created_at"),
     }
 }

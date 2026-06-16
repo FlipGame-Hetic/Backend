@@ -18,21 +18,21 @@ pub struct GameStateResponse {
     pub boss_hp_percent: Option<f32>,
 }
 
-impl From<game_logic::GameState> for GameStateResponse {
-    fn from(s: game_logic::GameState) -> Self {
-        let phase = match s.phase {
+impl From<game_logic::GameSnapshot> for GameStateResponse {
+    fn from(snap: game_logic::GameSnapshot) -> Self {
+        let phase = match snap.state.phase {
             game_logic::GamePhase::Idle => "idle",
             game_logic::GamePhase::InGame => "in_game",
             game_logic::GamePhase::GameOver => "game_over",
         };
         Self {
             phase: phase.to_owned(),
-            score: s.score,
-            lives: s.lives,
-            active_multiplier: s.active_multiplier,
-            ultimate_charge: s.ultimate_charge,
-            shield_active: s.shield_active,
-            boss_hp_percent: None,
+            score: snap.state.score,
+            lives: snap.state.lives,
+            active_multiplier: snap.current_multiplier,
+            ultimate_charge: snap.state.ultimate_charge,
+            shield_active: snap.state.shield_active,
+            boss_hp_percent: snap.boss_hp_percent,
         }
     }
 }

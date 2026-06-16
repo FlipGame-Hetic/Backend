@@ -2,17 +2,14 @@ use axum::extract::ws::{Message, WebSocket};
 use axum::extract::{Path, Query, State, WebSocketUpgrade};
 use axum::response::IntoResponse;
 use futures_util::{SinkExt, StreamExt};
-use game_logic::GameEngine;
 use lucyd::lucy_ws;
 use serde::Deserialize;
-use shared::screen::{ScreenEnvelope, ScreenId};
+use shared::screen::{ScreenEnvelope, ScreenEventType, ScreenId};
 use tracing::{debug, error, info, warn};
 
 use crate::errors::ApiError;
-use crate::modules::realtime::bridge_sync::sync_game_state_to_bridge;
-use crate::modules::scores::dto::SaveScoreRequest;
-use crate::modules::scores::service as score_service;
-use crate::state::{AppState, GameSession};
+use crate::modules::game::service::{GameService, GameServiceError};
+use crate::state::AppState;
 
 use super::auth;
 
@@ -141,127 +138,51 @@ async fn read_loop(
 }
 
 async fn process_screen_event(state: &AppState, envelope: &ScreenEnvelope) {
-    if envelope.event_type == "StartGame" {
-        handle_start_game(state, envelope).await;
-    } else {
-        handle_game_event(state, envelope).await;
+    match &envelope.event_type {
+        ScreenEventType::StartGame => {
+            let player_id = envelope
+                .payload
+                .get("player_id")
+                .and_then(|v| v.as_str())
+                .unwrap_or("unknown")
+                .to_owned();
+            let character_id = envelope
+                .payload
+                .get("character_id")
+                .and_then(|v| v.as_u64())
+                .unwrap_or(1) as u8;
+
+            match GameService::new(state).start(player_id, character_id).await {
+                Ok(_) => {}
+                Err(GameServiceError::AlreadyInProgress) => {
+                    warn!("StartGame ignored — game already in progress");
+                }
+                Err(e) => {
+                    error!(error = %e, "game service error starting game from screen");
+                }
+            }
+        }
+        ScreenEventType::RailStart => {
+            let ball_id = extract_ball_id(&envelope.payload);
+            GameService::new(state).start_rail(ball_id).await;
+        }
+        ScreenEventType::RailEnd => {
+            let ball_id = extract_ball_id(&envelope.payload);
+            GameService::new(state).end_rail(ball_id).await;
+        }
+        _ => {
+            if let Err(e) = GameService::new(state).process_screen_event(envelope).await {
+                error!(error = %e, "game service error processing screen event");
+            }
+        }
     }
 }
 
-async fn handle_start_game(state: &AppState, envelope: &ScreenEnvelope) {
-    let player_id = envelope
-        .payload
-        .get("player_id")
+fn extract_ball_id(payload: &serde_json::Value) -> Option<String> {
+    payload
+        .get("ball_id")
         .and_then(|v| v.as_str())
-        .unwrap_or("unknown")
-        .to_owned();
-    let character_id = envelope
-        .payload
-        .get("character_id")
-        .and_then(|v| v.as_u64())
-        .unwrap_or(1) as u8;
-
-    // Lock order: engine FIRST, session SECOND [§ 4.4]
-    let mut engine_guard = state.game_engine.lock().await;
-    let mut session_guard = state.active_session.lock().await;
-
-    // Policy: silently ignore if a game is already in progress [§ 4.2]
-    if session_guard.is_some() {
-        warn!("StartGame ignored — game already in progress");
-        drop(session_guard);
-        drop(engine_guard);
-        return;
-    }
-
-    let mut engine = GameEngine::new(character_id);
-    let envelopes = engine.process(game_logic::GameEvent::StartGame {
-        player_id: player_id.clone(),
-    });
-
-    let state_snapshot = engine.state.clone();
-
-    *engine_guard = Some(engine);
-    *session_guard = Some(GameSession {
-        player_id,
-        character_id,
-        boss_reached: 0,
-    });
-
-    // Unlock before any await [§ 4.4]
-    drop(session_guard);
-    drop(engine_guard);
-
-    let device_id = state.active_device_id.read().await.clone();
-    if device_id.is_none() {
-        warn!("no bridge connected — ESP32 sync skipped");
-    }
-
-    for env in envelopes {
-        let _ = state.screen_router.dispatch(env).await;
-    }
-
-    if let Some(id) = device_id {
-        sync_game_state_to_bridge(&state_snapshot, &state.hub, &id);
-    }
-}
-
-async fn handle_game_event(state: &AppState, envelope: &ScreenEnvelope) {
-    // Lock order: engine FIRST, session SECOND [§ 4.4]
-    let mut engine_guard = state.game_engine.lock().await;
-    let mut session_guard = state.active_session.lock().await;
-
-    let Some(engine) = engine_guard.as_mut() else {
-        drop(session_guard);
-        drop(engine_guard);
-        return;
-    };
-
-    let envelopes = engine.handle_screen_event(envelope);
-
-    for env in &envelopes {
-        if env.event_type == "BossDefeated"
-            && let Some(session) = session_guard.as_mut()
-        {
-            session.boss_reached = session.boss_reached.saturating_add(1);
-        }
-    }
-
-    let game_over = envelopes.iter().any(|e| e.event_type == "GameOver");
-    let score_snapshot = engine.state.score;
-    let state_snapshot = engine.state.clone();
-
-    let session_snapshot = if game_over {
-        *engine_guard = None;
-        session_guard.take()
-    } else {
-        None
-    };
-
-    // Unlock before any await [§ 4.4]
-    drop(session_guard);
-    drop(engine_guard);
-
-    let device_id = state.active_device_id.read().await.clone();
-
-    for env in envelopes {
-        let _ = state.screen_router.dispatch(env).await;
-    }
-
-    if let Some(id) = device_id {
-        sync_game_state_to_bridge(&state_snapshot, &state.hub, &id);
-    }
-
-    if game_over && let Some(session) = session_snapshot {
-        let req = SaveScoreRequest {
-            player_id: session.player_id,
-            character_id: session.character_id,
-            score: score_snapshot,
-            boss_reached: session.boss_reached,
-        };
-        if let Err(e) = score_service::save_score(&state.db_pool, req).await {
-            error!(error = %e, "failed to persist score after game over");
-        }
-    }
+        .map(|s| s.to_string())
 }
 
 async fn write_loop(
