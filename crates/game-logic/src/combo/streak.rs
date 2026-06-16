@@ -21,9 +21,9 @@ impl StreakState {
     /// Record a scoring event. Returns `true` if the multiplier tier changed.
     pub fn record(&mut self, now: Instant) -> bool {
         let prev_tier = self.tier();
-        let in_window = self
-            .last_at
-            .map_or(false, |t| now.duration_since(t) <= Duration::from_millis(STREAK_WINDOW_MS));
+        let in_window = self.last_at.map_or(false, |t| {
+            now.duration_since(t) <= Duration::from_millis(STREAK_WINDOW_MS)
+        });
         if in_window {
             self.count += 1;
         } else {
@@ -106,6 +106,10 @@ mod tests {
         for i in 0..STREAK_TIER_1_COUNT as u64 {
             tier_changed = s.record(now + Duration::from_millis(i * 100));
         }
-        assert!(tier_changed, "should detect tier change at count={}", STREAK_TIER_1_COUNT);
+        assert!(
+            tier_changed,
+            "should detect tier change at count={}",
+            STREAK_TIER_1_COUNT
+        );
     }
 }

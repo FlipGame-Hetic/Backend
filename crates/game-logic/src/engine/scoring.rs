@@ -56,7 +56,6 @@ pub fn rail_tick_score(fib_step: u32, multiplier: f32) -> u64 {
     (RAIL_BASE_SCORE as f32 * fib * multiplier) as u64
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;

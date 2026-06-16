@@ -258,7 +258,9 @@ impl<'a> GameService<'a> {
             }
         }
 
-        let key = RailSessionKey { ball_id: ball_id.clone() };
+        let key = RailSessionKey {
+            ball_id: ball_id.clone(),
+        };
         let (tx, rx) = tokio::sync::oneshot::channel();
 
         self.state.active_rail_sessions.lock().await.insert(key, tx);

@@ -239,7 +239,8 @@ impl GameEngine {
                 }
             }
 
-            GameEvent::BumperHit { pts, ref ball_id } | GameEvent::BumperTriangleHit { pts, ref ball_id } => {
+            GameEvent::BumperHit { pts, ref ball_id }
+            | GameEvent::BumperTriangleHit { pts, ref ball_id } => {
                 if self.state.phase != GamePhase::InGame {
                     return envelopes;
                 }
@@ -408,7 +409,6 @@ impl GameEngine {
                 envelopes.push(self.emit_scored_delta(scored, "rail", ball_id));
                 envelopes.push(self.emit_score_update(bid));
             }
-
         }
 
         envelopes
@@ -502,7 +502,12 @@ impl GameEngine {
         self.emit_scored_delta(delta, reason, None)
     }
 
-    fn emit_scored_delta(&self, delta: u64, reason: &str, ball_id: Option<String>) -> ScreenEnvelope {
+    fn emit_scored_delta(
+        &self,
+        delta: u64,
+        reason: &str,
+        ball_id: Option<String>,
+    ) -> ScreenEnvelope {
         let mut payload = serde_json::json!({
             "delta": delta,
             "reason": reason,
@@ -589,8 +594,6 @@ mod tests {
         );
     }
 
-
-
     #[test]
     fn rail_tick_fibonacci_progression() {
         let mut engine = started_engine();
@@ -642,7 +645,10 @@ mod tests {
             .iter()
             .find(|e| e.event_type == ScreenEventType::ScoreDelta)
             .expect("ScoreDelta should be emitted");
-        assert_eq!(delta_env.payload["ball_id"], serde_json::json!("ball-uuid-2"));
+        assert_eq!(
+            delta_env.payload["ball_id"],
+            serde_json::json!("ball-uuid-2")
+        );
     }
 
     #[test]
@@ -743,7 +749,10 @@ mod tests {
             .iter()
             .find(|e| e.event_type == ScreenEventType::ScoreUpdate)
             .expect("ScoreUpdate should be emitted");
-        assert_eq!(update_env.payload["ball_id"], serde_json::json!("ball-uuid-2"));
+        assert_eq!(
+            update_env.payload["ball_id"],
+            serde_json::json!("ball-uuid-2")
+        );
     }
 
     #[test]
