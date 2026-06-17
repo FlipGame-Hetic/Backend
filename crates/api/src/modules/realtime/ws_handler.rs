@@ -104,7 +104,8 @@ async fn read_loop(mut stream: futures_util::stream::SplitStream<WebSocket>, sta
 
 async fn process_inbound(state: &AppState, payload: &shared::events::InboundMessage) {
     if let shared::events::InboundMessage::Button(btn) = payload
-        && btn.id == shared::model::ButtonId::Start && btn.state > 0
+        && btn.id == shared::model::ButtonId::Start
+        && btn.state > 0
     {
         forward_start_button(state).await;
     }
@@ -140,7 +141,9 @@ async fn forward_start_button(state: &AppState) {
 
     let envelope = ScreenEnvelope {
         from: ScreenId::BackScreen,
-        to: ScreenTarget::Screen { id: ScreenId::FrontScreen },
+        to: ScreenTarget::Screen {
+            id: ScreenId::FrontScreen,
+        },
         event_type,
         payload,
     };
