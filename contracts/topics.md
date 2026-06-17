@@ -30,7 +30,7 @@ Prefix: `pinball/<deviceId>/`
 
 | Field   | Type   | Description                                                    |
 | ------- | ------ | -------------------------------------------------------------- |
-| `id`    | string | `flipper_left`, `flipper_right`, `start`, `extra_1`, `extra_2` |
+| `id`    | string | `R1`, `R2`, `L1`, `L2`, `under_plunger`, `top`, `middle`, `bottom` |
 | `state` | int    | `1` = pressed, `0` = released                                  |
 | `ts`    | int    | ESP32 `millis()` timestamp                                     |
 
@@ -42,19 +42,19 @@ Each button sends its own independent message. Simultaneous presses = multiple m
 
 ```json
 {
-    "position": 0.75,
-    "released": false,
+    "state": 1,
     "ts": 84200
 }
 ```
 
-| Field      | Type  | Description                                             |
-| ---------- | ----- | ------------------------------------------------------- |
-| `position` | float | Pull distance (0.0 = rest, 1.0 = fully pulled)          |
-| `released` | bool  | `true` on the frame the player lets go (launch trigger) |
-| `ts`       | int   | ESP32 `millis()` timestamp                              |
+| Field   | Type   | Description                                                    |
+| ------- | ------ | -------------------------------------------------------------- |
+| `state` | int    | `1` = pressed, `0` = released                                  |
+| `ts`    | int    | ESP32 `millis()` timestamp                                     |
 
-Sent continuously while pulled (~30Hz). On release, one final message with `released: true` so the server can calculate launch force from last `position`.
+The plunger now just sends a message when triggered.
+
+~~Sent continuously while pulled (~30Hz). On release, one final message with `released: true` so the server can calculate launch force from last `position`.~~
 
 ---
 
