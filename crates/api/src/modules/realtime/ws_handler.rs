@@ -1,95 +1,61 @@
 use axum::extract::ws::{Message, WebSocket};
-use axum::extract::{Path, Query, State, WebSocketUpgrade};
+use axum::extract::{State, WebSocketUpgrade};
 use axum::response::IntoResponse;
+use futures_util::stream::SplitSink;
 use futures_util::{SinkExt, StreamExt};
 use lucyd::lucy_ws;
-use serde::Deserialize;
-use shared::screen::{ScreenEnvelope, ScreenEventType, ScreenId};
+use shared::events::WsMessage;
+use tokio::sync::broadcast;
 use tracing::{debug, error, info, warn};
 
-use crate::errors::ApiError;
-use crate::modules::game::service::{GameService, GameServiceError};
+use crate::modules::game::service::GameService;
 use crate::state::AppState;
 
-use super::auth;
-
-#[derive(Debug, Deserialize)]
-pub struct TokenQuery {
-    pub token: String,
-}
-
+/// Axum handler: upgrade HTTP to WebSocket for a bridge connection.
 #[lucy_ws(
-    path        = "/ws/screen/{screen_id}",
-    tags        = "screens, realtime",
-    request     = ScreenEnvelope,
-    description = "Per-screen WebSocket, authenticated by JWT, relays ScreenEnvelope frames",
+    path = "/ws/bridge",
+    tags = "realtime",
+    description = "MQTT bridge WebSocket, bidirectional relay between the backend and the mqtt-bridge process"
 )]
-pub async fn ws_screen(
-    ws: WebSocketUpgrade,
-    Path(screen_id_raw): Path<String>,
-    Query(query): Query<TokenQuery>,
-    State(state): State<AppState>,
-) -> Result<impl IntoResponse, ApiError> {
-    let screen_id: ScreenId = screen_id_raw
-        .parse()
-        .map_err(|_| ApiError::BadRequest(format!("unknown screen id: '{screen_id_raw}'")))?;
-
-    auth::verify_and_match(&query.token, &state.jwt_secret, screen_id).map_err(|e| {
-        warn!(screen = %screen_id, error = %e, "screen auth failed");
-        ApiError::BadRequest(format!("authentication failed: {e}"))
-    })?;
-
-    info!(screen = %screen_id, "screen websocket upgrade accepted");
-
-    Ok(ws.on_upgrade(move |socket| handle_screen(socket, screen_id, state)))
+pub async fn ws_bridge(ws: WebSocketUpgrade, State(state): State<AppState>) -> impl IntoResponse {
+    info!("bridge websocket upgrade requested");
+    ws.on_upgrade(|socket| handle_bridge(socket, state))
 }
 
-async fn handle_screen(socket: WebSocket, screen_id: ScreenId, state: AppState) {
-    info!(screen = %screen_id, "screen websocket connected");
-
-    let handle = match state.screen_registry.register(screen_id).await {
-        Ok(h) => h,
-        Err(e) => {
-            error!(screen = %screen_id, error = %e, "failed to register screen");
-            return;
-        }
-    };
-
-    let (rx, _guard) = handle.into_parts();
+async fn handle_bridge(socket: WebSocket, state: AppState) {
+    info!("bridge websocket connected");
 
     let (sink, stream) = socket.split();
+    let hub_rx = state.hub.subscribe();
 
-    let write_handle = tokio::spawn(write_loop(screen_id, rx, sink));
-    let read_handle = tokio::spawn(read_loop(screen_id, stream, state));
+    let write_handle = tokio::spawn(write_loop(sink, hub_rx));
+    let read_handle = tokio::spawn(read_loop(stream, state.clone()));
 
     tokio::select! {
         res = read_handle => {
             match res {
-                Ok(()) => info!(screen = %screen_id, "screen read loop ended"),
-                Err(e) => error!(screen = %screen_id, error = %e, "screen read loop panicked"),
+                Ok(()) => info!("bridge read loop ended"),
+                Err(e) => error!(error = %e, "bridge read loop panicked"),
             }
         }
         res = write_handle => {
             match res {
-                Ok(()) => info!(screen = %screen_id, "screen write loop ended"),
-                Err(e) => error!(screen = %screen_id, error = %e, "screen write loop panicked"),
+                Ok(()) => info!("bridge write loop ended"),
+                Err(e) => error!(error = %e, "bridge write loop panicked"),
             }
         }
     }
 
-    info!(screen = %screen_id, "screen websocket disconnected");
+    *state.active_device_id.write().await = None;
+    info!("bridge websocket disconnected");
 }
 
-async fn read_loop(
-    screen_id: ScreenId,
-    mut stream: futures_util::stream::SplitStream<WebSocket>,
-    state: AppState,
-) {
+async fn read_loop(mut stream: futures_util::stream::SplitStream<WebSocket>, state: AppState) {
     while let Some(frame) = stream.next().await {
         let msg = match frame {
             Ok(m) => m,
             Err(e) => {
-                warn!(screen = %screen_id, error = %e, "ws read error");
+                warn!(error = %e, "bridge ws read error");
                 break;
             }
         };
@@ -97,113 +63,119 @@ async fn read_loop(
         let text = match msg {
             Message::Text(t) => t,
             Message::Close(_) => {
-                info!(screen = %screen_id, "screen sent close frame");
+                info!("bridge sent close frame");
                 break;
             }
             Message::Ping(_) | Message::Pong(_) => continue,
             Message::Binary(_) => {
-                debug!(screen = %screen_id, "ignoring binary frame");
+                debug!("ignoring binary frame from bridge");
                 continue;
             }
         };
 
-        let envelope: ScreenEnvelope = match serde_json::from_str(&text) {
-            Ok(e) => e,
+        let ws_msg: WsMessage = match serde_json::from_str(&text) {
+            Ok(m) => m,
             Err(e) => {
-                warn!(screen = %screen_id, error = %e, "invalid JSON from screen");
+                warn!(error = %e, "invalid JSON from bridge");
                 continue;
             }
         };
 
-        if envelope.from != screen_id {
-            warn!(
-                screen = %screen_id,
-                claimed_from = %envelope.from,
-                "screen tried to spoof 'from' field, ignoring"
-            );
-            continue;
-        }
+        match ws_msg {
+            WsMessage::Inbound {
+                ref device_id,
+                ref payload,
+            } => {
+                debug!(device_id = %device_id, payload = ?payload, "received inbound from bridge");
 
-        let result = state.screen_router.dispatch(envelope.clone()).await;
-        debug!(
-            screen = %screen_id,
-            delivered = result.delivered,
-            missed = ?result.missed,
-            intercepted = result.intercepted,
-            "dispatch result"
-        );
-
-        process_screen_event(&state, &envelope).await;
-    }
-}
-
-async fn process_screen_event(state: &AppState, envelope: &ScreenEnvelope) {
-    match &envelope.event_type {
-        ScreenEventType::StartGame => {
-            let player_id = envelope
-                .payload
-                .get("player_id")
-                .and_then(|v| v.as_str())
-                .unwrap_or("unknown")
-                .to_owned();
-            let character_id = envelope
-                .payload
-                .get("character_id")
-                .and_then(|v| v.as_u64())
-                .unwrap_or(1) as u8;
-
-            match GameService::new(state).start(player_id, character_id).await {
-                Ok(_) => {}
-                Err(GameServiceError::AlreadyInProgress) => {
-                    warn!("StartGame ignored — game already in progress");
+                {
+                    let mut id_guard = state.active_device_id.write().await;
+                    *id_guard = Some(device_id.clone());
                 }
-                Err(e) => {
-                    error!(error = %e, "game service error starting game from screen");
-                }
+
+                process_inbound(&state, payload).await;
             }
-        }
-        ScreenEventType::RailStart => {
-            let ball_id = extract_ball_id(&envelope.payload);
-            GameService::new(state).start_rail(ball_id).await;
-        }
-        ScreenEventType::RailEnd => {
-            let ball_id = extract_ball_id(&envelope.payload);
-            GameService::new(state).end_rail(ball_id).await;
-        }
-        _ => {
-            if let Err(e) = GameService::new(state).process_screen_event(envelope).await {
-                error!(error = %e, "game service error processing screen event");
+            WsMessage::Outbound { .. } => {
+                warn!("received outbound message from bridge (unexpected direction), ignoring");
             }
         }
     }
 }
 
-fn extract_ball_id(payload: &serde_json::Value) -> Option<String> {
-    payload
-        .get("ball_id")
-        .and_then(|v| v.as_str())
-        .map(|s| s.to_string())
+async fn process_inbound(state: &AppState, payload: &shared::events::InboundMessage) {
+    if let shared::events::InboundMessage::Button(btn) = payload
+        && btn.id == shared::model::ButtonId::Start && btn.state > 0
+    {
+        forward_start_button(state).await;
+    }
+
+    if let Err(e) = GameService::new(state).process_inbound(payload).await {
+        error!(error = %e, "game service error processing inbound");
+    }
+}
+
+async fn forward_start_button(state: &AppState) {
+    use game_logic::GamePhase;
+    use shared::screen::{ScreenEnvelope, ScreenEventType, ScreenId, ScreenTarget};
+
+    let engine_phase = {
+        let guard = state.game_engine.lock().await;
+        guard.as_ref().map(|e| e.state.phase.clone())
+    };
+
+    let (event_type, payload) = match engine_phase {
+        None | Some(GamePhase::Idle) => (
+            ScreenEventType::Unknown("menu_confirm".to_string()),
+            serde_json::json!({ "context": "idle" }),
+        ),
+        Some(GamePhase::InGame) => (
+            ScreenEventType::Unknown("button_start".to_string()),
+            serde_json::json!({}),
+        ),
+        Some(GamePhase::GameOver) => (
+            ScreenEventType::Unknown("menu_confirm".to_string()),
+            serde_json::json!({ "context": "game_over" }),
+        ),
+    };
+
+    let envelope = ScreenEnvelope {
+        from: ScreenId::BackScreen,
+        to: ScreenTarget::Screen { id: ScreenId::FrontScreen },
+        event_type,
+        payload,
+    };
+
+    state.screen_router.dispatch(envelope).await;
 }
 
 async fn write_loop(
-    screen_id: ScreenId,
-    mut rx: tokio::sync::mpsc::Receiver<ScreenEnvelope>,
-    mut sink: futures_util::stream::SplitSink<WebSocket, Message>,
+    mut sink: SplitSink<WebSocket, Message>,
+    mut hub_rx: broadcast::Receiver<WsMessage>,
 ) {
-    while let Some(envelope) = rx.recv().await {
-        let json = match serde_json::to_string(&envelope) {
+    loop {
+        let msg = match hub_rx.recv().await {
+            Ok(m) => m,
+            Err(broadcast::error::RecvError::Lagged(n)) => {
+                warn!(skipped = n, "bridge ws write lagged, some messages dropped");
+                continue;
+            }
+            Err(broadcast::error::RecvError::Closed) => {
+                info!("hub broadcast closed, stopping write loop");
+                break;
+            }
+        };
+
+        let json = match serde_json::to_string(&msg) {
             Ok(j) => j,
             Err(e) => {
-                error!(screen = %screen_id, error = %e, "failed to serialize envelope");
+                error!(error = %e, "failed to serialize outbound message");
                 continue;
             }
         };
 
         if let Err(e) = sink.send(Message::Text(json.into())).await {
-            warn!(screen = %screen_id, error = %e, "failed to send to screen, closing");
+            warn!(error = %e, "failed to send to bridge ws, closing write loop");
             break;
         }
     }
-
-    info!(screen = %screen_id, "write loop ended (channel closed)");
 }
