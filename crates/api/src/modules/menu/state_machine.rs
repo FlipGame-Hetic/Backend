@@ -32,6 +32,12 @@ pub struct MenuStateMachine {
     cursor: u8,
 }
 
+impl Default for MenuStateMachine {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl MenuStateMachine {
     pub fn new() -> Self {
         Self {
