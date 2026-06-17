@@ -11,8 +11,8 @@ pub enum ButtonSide {
 impl ButtonSide {
     pub fn from_button_id(id: &ButtonId) -> Option<Self> {
         match id {
-            ButtonId::FlipperLeft => Some(Self::Left),
-            ButtonId::FlipperRight => Some(Self::Right),
+            ButtonId::L1 => Some(Self::Left),
+            ButtonId::R1 => Some(Self::Right),
             _ => None,
         }
     }

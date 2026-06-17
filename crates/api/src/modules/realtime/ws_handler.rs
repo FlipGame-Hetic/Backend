@@ -88,7 +88,6 @@ async fn read_loop(mut stream: futures_util::stream::SplitStream<WebSocket>, sta
             } => {
                 debug!(device_id = %device_id, payload = ?payload, "received inbound from bridge");
 
-                // Update the active device id so screen handlers know where to sync
                 {
                     let mut id_guard = state.active_device_id.write().await;
                     *id_guard = Some(device_id.clone());
@@ -104,6 +103,37 @@ async fn read_loop(mut stream: futures_util::stream::SplitStream<WebSocket>, sta
 }
 
 async fn process_inbound(state: &AppState, payload: &shared::events::InboundMessage) {
+    if let shared::events::InboundMessage::Button(btn) = payload {
+        let game_running = state.game_engine.lock().await.is_some();
+
+        if !game_running && btn.state > 0 {
+            let result = state.menu_state.lock().await.handle_button(&btn.id);
+
+            match result {
+                crate::modules::menu::state_machine::MenuResult::Envelopes(envelopes) => {
+                    for env in envelopes {
+                        let _ = state.screen_router.dispatch(env).await;
+                    }
+                    return;
+                }
+                crate::modules::menu::state_machine::MenuResult::StartGame {
+                    player_id,
+                    character_id,
+                    envelopes,
+                } => {
+                    for env in envelopes {
+                        let _ = state.screen_router.dispatch(env).await;
+                    }
+                    if let Err(e) = GameService::new(state).start(player_id, character_id).await {
+                        error!(error = %e, "failed to start game from menu");
+                    }
+                    return;
+                }
+                crate::modules::menu::state_machine::MenuResult::Ignored => return,
+            }
+        }
+    }
+
     if let Err(e) = GameService::new(state).process_inbound(payload).await {
         error!(error = %e, "game service error processing inbound");
     }

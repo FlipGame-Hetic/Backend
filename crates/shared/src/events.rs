@@ -193,14 +193,14 @@ mod tests {
         let msg = WsMessage::Inbound {
             device_id: "borne-01".into(),
             payload: InboundMessage::Button(ButtonInput {
-                id: ButtonId::FlipperLeft,
+                id: ButtonId::L1,
                 state: 1,
                 ts: 123,
             }),
         };
         assert_ws_roundtrip(
             &msg,
-            r#"{"dir":"inbound","device_id":"borne-01","payload":{"_type":"Button","id":"flipper_left","state":1,"ts":123}}"#,
+            r#"{"dir":"inbound","device_id":"borne-01","payload":{"_type":"Button","id":"L1","state":1,"ts":123}}"#,
         );
     }
 

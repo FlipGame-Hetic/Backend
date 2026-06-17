@@ -1,6 +1,7 @@
 use std::time::Instant;
 
 use shared::events::InboundMessage;
+use shared::model::ButtonId;
 use shared::screen::{ScreenEnvelope, ScreenEventType, ScreenId, ScreenTarget};
 
 use crate::combo::{ComboDetector, ComboResult, MultiplierState, StreakState};
@@ -68,10 +69,40 @@ impl GameEngine {
 
     pub fn handle_inbound(&mut self, msg: &InboundMessage) -> Vec<ScreenEnvelope> {
         match msg {
-            InboundMessage::Button(btn) if btn.state > 0 => {
+            InboundMessage::Button(btn) => {
                 if let Some(side) = ButtonSide::from_button_id(&btn.id) {
-                    return self.process(GameEvent::ButtonPressed { side });
+                    let event_type = match &side {
+                        ButtonSide::Left => ScreenEventType::FlipperLeft,
+                        ButtonSide::Right => ScreenEventType::FlipperRight,
+                    };
+                    let mut envelopes = vec![make_event_envelope(
+                        event_type,
+                        serde_json::json!({ "state": btn.state }),
+                    )];
+                    if btn.state > 0 {
+                        envelopes.extend(self.process(GameEvent::ButtonPressed { side }));
+                    }
+                    return envelopes;
                 }
+
+                if btn.state > 0 && self.state.phase == GamePhase::InGame {
+                    match btn.id {
+                        ButtonId::L2 => {
+                            return vec![make_event_envelope(
+                                ScreenEventType::CapacityL2,
+                                serde_json::Value::Null,
+                            )];
+                        }
+                        ButtonId::R2 => {
+                            return vec![make_event_envelope(
+                                ScreenEventType::CapacityR2,
+                                serde_json::Value::Null,
+                            )];
+                        }
+                        _ => {}
+                    }
+                }
+
                 vec![]
             }
             InboundMessage::Gyro(gyro) if gyro.tilt => self.process(GameEvent::TiltDetected),

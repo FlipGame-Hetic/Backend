@@ -119,6 +119,14 @@ pub enum ScreenEventType {
     MalusBlackHole,
     MalusModifyBounce,
     MalusStickyBumpers,
+    MenuNavigateLeft,
+    MenuNavigateRight,
+    MenuNext,
+    MenuPrev,
+    MenuCancel,
+    GameBegin,
+    CapacityL2,
+    CapacityR2,
     /// Extension / test events that are not part of the known protocol.
     Unknown(String),
 }
@@ -167,6 +175,14 @@ impl ScreenEventType {
             Self::MalusBlackHole => "MalusBlackHole",
             Self::MalusModifyBounce => "MalusModifyBounce",
             Self::MalusStickyBumpers => "MalusStickyBumpers",
+            Self::MenuNavigateLeft => "MenuNavigateLeft",
+            Self::MenuNavigateRight => "MenuNavigateRight",
+            Self::MenuNext => "MenuNext",
+            Self::MenuPrev => "MenuPrev",
+            Self::MenuCancel => "MenuCancel",
+            Self::GameBegin => "GameBegin",
+            Self::CapacityL2 => "CapacityL2",
+            Self::CapacityR2 => "CapacityR2",
             Self::Unknown(s) => s.as_str(),
         }
     }
@@ -222,6 +238,14 @@ impl From<String> for ScreenEventType {
             "MalusBlackHole" => Self::MalusBlackHole,
             "MalusModifyBounce" => Self::MalusModifyBounce,
             "MalusStickyBumpers" => Self::MalusStickyBumpers,
+            "MenuNavigateLeft" => Self::MenuNavigateLeft,
+            "MenuNavigateRight" => Self::MenuNavigateRight,
+            "MenuNext" => Self::MenuNext,
+            "MenuPrev" => Self::MenuPrev,
+            "MenuCancel" => Self::MenuCancel,
+            "GameBegin" => Self::GameBegin,
+            "CapacityL2" => Self::CapacityL2,
+            "CapacityR2" => Self::CapacityR2,
             _ => Self::Unknown(s),
         }
     }

@@ -89,7 +89,7 @@ mod tests {
 
         match handled.message {
             InboundMessage::Button(btn) => {
-                assert_eq!(btn.id, ButtonId::FlipperLeft);
+                assert_eq!(btn.id, ButtonId::L1);
                 assert_eq!(btn.state, 1);
                 assert_eq!(btn.ts, 84200);
             }
