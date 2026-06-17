@@ -22,7 +22,7 @@ Prefix: `pinball/<deviceId>/`
 
 ```json
 {
-    "id": "flipper_left",
+    "id": "L1",
     "state": 1,
     "ts": 84200
 }
