@@ -2,21 +2,24 @@
   "esp32_to_pc": {
     "input/button": {
       "press": {
-        "id": "flipper_left",
+        "id": "R1",
         "state": 1,
         "ts": 84200
       },
       "release": {
-        "id": "flipper_left",
+        "id": "R2",
         "state": 0,
         "ts": 84350
       },
       "button_ids": [
-        "flipper_left",
-        "flipper_right",
-        "start",
-        "extra_1",
-        "extra_2"
+        "R1",
+        "R2",
+        "L1",
+        "L2",
+        "under_plunger",
+        "top",
+        "middle",
+        "bottom"
       ]
     },
     "input/plunger": {
