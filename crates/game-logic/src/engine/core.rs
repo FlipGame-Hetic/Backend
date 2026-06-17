@@ -1,6 +1,7 @@
 use std::time::Instant;
 
 use shared::events::InboundMessage;
+use shared::model::ButtonId;
 use shared::screen::{ScreenEnvelope, ScreenEventType, ScreenId, ScreenTarget};
 
 use crate::combo::{ComboDetector, ComboResult, MultiplierState, StreakState};
@@ -83,6 +84,25 @@ impl GameEngine {
                     }
                     return envelopes;
                 }
+
+                if btn.state > 0 && self.state.phase == GamePhase::InGame {
+                    match btn.id {
+                        ButtonId::L2 => {
+                            return vec![make_event_envelope(
+                                ScreenEventType::CapacityL2,
+                                serde_json::Value::Null,
+                            )];
+                        }
+                        ButtonId::R2 => {
+                            return vec![make_event_envelope(
+                                ScreenEventType::CapacityR2,
+                                serde_json::Value::Null,
+                            )];
+                        }
+                        _ => {}
+                    }
+                }
+
                 vec![]
             }
             InboundMessage::Gyro(gyro) if gyro.tilt => self.process(GameEvent::TiltDetected),

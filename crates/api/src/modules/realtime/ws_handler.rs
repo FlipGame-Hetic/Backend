@@ -103,52 +103,40 @@ async fn read_loop(mut stream: futures_util::stream::SplitStream<WebSocket>, sta
 }
 
 async fn process_inbound(state: &AppState, payload: &shared::events::InboundMessage) {
-    if let shared::events::InboundMessage::Button(btn) = payload
-        && btn.id == shared::model::ButtonId::Start
-        && btn.state > 0
-    {
-        forward_start_button(state).await;
+    if let shared::events::InboundMessage::Button(btn) = payload {
+        let game_running = state.game_engine.lock().await.is_some();
+
+        if !game_running && btn.state > 0 {
+            let result = state.menu_state.lock().await.handle_button(&btn.id);
+
+            match result {
+                crate::modules::menu::state_machine::MenuResult::Envelopes(envelopes) => {
+                    for env in envelopes {
+                        let _ = state.screen_router.dispatch(env).await;
+                    }
+                    return;
+                }
+                crate::modules::menu::state_machine::MenuResult::StartGame {
+                    player_id,
+                    character_id,
+                    envelopes,
+                } => {
+                    for env in envelopes {
+                        let _ = state.screen_router.dispatch(env).await;
+                    }
+                    if let Err(e) = GameService::new(state).start(player_id, character_id).await {
+                        error!(error = %e, "failed to start game from menu");
+                    }
+                    return;
+                }
+                crate::modules::menu::state_machine::MenuResult::Ignored => return,
+            }
+        }
     }
 
     if let Err(e) = GameService::new(state).process_inbound(payload).await {
         error!(error = %e, "game service error processing inbound");
     }
-}
-
-async fn forward_start_button(state: &AppState) {
-    use game_logic::GamePhase;
-    use shared::screen::{ScreenEnvelope, ScreenEventType, ScreenId, ScreenTarget};
-
-    let engine_phase = {
-        let guard = state.game_engine.lock().await;
-        guard.as_ref().map(|e| e.state.phase.clone())
-    };
-
-    let (event_type, payload) = match engine_phase {
-        None | Some(GamePhase::Idle) => (
-            ScreenEventType::Unknown("menu_confirm".to_string()),
-            serde_json::json!({ "context": "idle" }),
-        ),
-        Some(GamePhase::InGame) => (
-            ScreenEventType::Unknown("button_start".to_string()),
-            serde_json::json!({}),
-        ),
-        Some(GamePhase::GameOver) => (
-            ScreenEventType::Unknown("menu_confirm".to_string()),
-            serde_json::json!({ "context": "game_over" }),
-        ),
-    };
-
-    let envelope = ScreenEnvelope {
-        from: ScreenId::BackScreen,
-        to: ScreenTarget::Screen {
-            id: ScreenId::FrontScreen,
-        },
-        event_type,
-        payload,
-    };
-
-    state.screen_router.dispatch(envelope).await;
 }
 
 async fn write_loop(
