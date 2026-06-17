@@ -100,14 +100,14 @@ mod tests {
     #[test]
     fn handle_plunger_release() {
         let topic = "pinball/esp01/input/plunger";
-        let payload = br#"{"position":0.82,"released":true,"ts":84450}"#;
+        let payload = br#"{"state":0,"ts":84450}"#;
 
         let handled = handle_publish(topic, payload).unwrap();
 
         match handled.message {
             InboundMessage::Plunger(p) => {
-                assert!(p.released);
-                assert!((p.position - 0.82).abs() < f32::EPSILON);
+                assert_eq!(p.state, 0);
+                assert_eq!(p.ts, 84450);
             }
             other => panic!("expected Plunger, got {other:?}"),
         }

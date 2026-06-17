@@ -5,7 +5,7 @@ Prefix: `pinball/<deviceId>/`
 | Topic           |           Description            | Sent by | Payload        |
 | --------------- | :------------------------------: | :-----: | -------------- |
 | `input/button`  |   button state (press/release)   |  ESP32  | JSON button    |
-| `input/plunger` |    plunger position + release    |  ESP32  | JSON plunger   |
+| `input/plunger` |      plunger press/release       |  ESP32  | JSON plunger   |
 | `input/gyro`    |    gyroscope / tilt detection    |  ESP32  | JSON gyro      |
 | `ball/hit`      |      active collisions list      | Server  | JSON hit       |
 | `game/state`    |       game state (retain)        | Server  | JSON state     |
@@ -256,7 +256,7 @@ ESP32 maps each `id` to the nearest vibrator(s) via a static lookup table.
 pinball/<deviceId>/
 ├── input/
 │   ├── button            ESP32 → Server     Player inputs (5 buttons)
-│   ├── plunger           ESP32 → Server     Plunger position + release
+│   ├── plunger           ESP32 → Server     Plunger press/release
 │   └── gyro              ESP32 → Server     Gyroscope / tilt 20Hz
 ├── ball/
 │   └── hit               Server → ESP32     Active collisions list
@@ -273,7 +273,7 @@ pinball/<deviceId>/
 ## Notes
 
 - **No ball position tracking**: the server only sends collision events. ESP32 maps each object `id` to the nearest vibrator(s) via a static lookup table.
-- **Plunger**: analog read (potentiometer or hall sensor), sent continuously while pulled. The `released` flag lets the server know when to launch.
+- **Plunger**: digital press/release, sends `{ state, ts }` on trigger. No continuous stream.
 - **Gyro tilt**: ESP32 detects tilt locally and flags it. Raw accelerometer data also sent for 3JS nudge effect.
 - **Simultaneous buttons**: each button fires its own message independently via GPIO interrupts.
 - **Retain**: only `game/state` and `status` use retain for reconnection recovery.

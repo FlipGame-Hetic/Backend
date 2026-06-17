@@ -106,7 +106,7 @@ impl GameEngine {
                 vec![]
             }
             InboundMessage::Gyro(gyro) if gyro.tilt => self.process(GameEvent::TiltDetected),
-            InboundMessage::Plunger(plunger) if plunger.released => {
+            InboundMessage::Plunger(plunger) if plunger.state == 0 => {
                 self.process(GameEvent::BallLaunched)
             }
             _ => vec![],

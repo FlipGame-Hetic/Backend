@@ -13,8 +13,7 @@ pub struct ButtonInput {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PlungerInput {
-    pub position: f32,
-    pub released: bool,
+    pub state: u8,
     pub ts: u64,
 }
 
@@ -208,15 +207,11 @@ mod tests {
     fn ws_inbound_plunger_roundtrip() {
         let msg = WsMessage::Inbound {
             device_id: "borne-01".into(),
-            payload: InboundMessage::Plunger(PlungerInput {
-                position: 0.5,
-                released: true,
-                ts: 456,
-            }),
+            payload: InboundMessage::Plunger(PlungerInput { state: 0, ts: 456 }),
         };
         assert_ws_roundtrip(
             &msg,
-            r#"{"dir":"inbound","device_id":"borne-01","payload":{"_type":"Plunger","position":0.5,"released":true,"ts":456}}"#,
+            r#"{"dir":"inbound","device_id":"borne-01","payload":{"_type":"Plunger","state":0,"ts":456}}"#,
         );
     }
 
