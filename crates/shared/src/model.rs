@@ -14,6 +14,8 @@ pub enum ButtonId {
     R2,
     #[serde(rename = "Start", alias = "start")]
     Start,
+    #[serde(rename = "under_plunger")]
+    UnderPlunger,
 }
 
 // Collision object types

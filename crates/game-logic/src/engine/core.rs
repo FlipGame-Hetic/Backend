@@ -85,19 +85,29 @@ impl GameEngine {
                     return envelopes;
                 }
 
-                if btn.state > 0 && self.state.phase == GamePhase::InGame {
+                if self.state.phase == GamePhase::InGame {
                     match btn.id {
-                        ButtonId::L2 => {
+                        ButtonId::L2 if btn.state > 0 => {
                             return vec![make_event_envelope(
                                 ScreenEventType::CapacityL2,
                                 serde_json::Value::Null,
                             )];
                         }
-                        ButtonId::R2 => {
+                        ButtonId::R2 if btn.state > 0 => {
                             return vec![make_event_envelope(
                                 ScreenEventType::CapacityR2,
                                 serde_json::Value::Null,
                             )];
+                        }
+                        ButtonId::UnderPlunger => {
+                            let mut envelopes = vec![make_event_envelope(
+                                ScreenEventType::PlungerCharge,
+                                serde_json::json!({ "state": btn.state }),
+                            )];
+                            if btn.state == 0 {
+                                envelopes.extend(self.process(GameEvent::BallLaunched));
+                            }
+                            return envelopes;
                         }
                         _ => {}
                     }
