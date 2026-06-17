@@ -68,9 +68,20 @@ impl GameEngine {
 
     pub fn handle_inbound(&mut self, msg: &InboundMessage) -> Vec<ScreenEnvelope> {
         match msg {
-            InboundMessage::Button(btn) if btn.state > 0 => {
+            InboundMessage::Button(btn) => {
                 if let Some(side) = ButtonSide::from_button_id(&btn.id) {
-                    return self.process(GameEvent::ButtonPressed { side });
+                    let event_type = match &side {
+                        ButtonSide::Left => ScreenEventType::FlipperLeft,
+                        ButtonSide::Right => ScreenEventType::FlipperRight,
+                    };
+                    let mut envelopes = vec![make_event_envelope(
+                        event_type,
+                        serde_json::json!({ "state": btn.state }),
+                    )];
+                    if btn.state > 0 {
+                        envelopes.extend(self.process(GameEvent::ButtonPressed { side }));
+                    }
+                    return envelopes;
                 }
                 vec![]
             }
