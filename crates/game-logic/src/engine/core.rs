@@ -71,6 +71,12 @@ impl GameEngine {
         match msg {
             InboundMessage::Button(btn) => {
                 if let Some(side) = ButtonSide::from_button_id(&btn.id) {
+                    // IOT firmware fires two onPress callbacks instead of onPress+onRelease,
+                    // so state=0 arrives immediately after state=1 and is never a real release.
+                    // Suppress it to prevent flipper flicker on screen.
+                    if btn.state == 0 {
+                        return vec![];
+                    }
                     let event_type = match &side {
                         ButtonSide::Left => ScreenEventType::FlipperLeft,
                         ButtonSide::Right => ScreenEventType::FlipperRight,
@@ -79,9 +85,7 @@ impl GameEngine {
                         event_type,
                         serde_json::json!({ "state": btn.state }),
                     )];
-                    if btn.state > 0 {
-                        envelopes.extend(self.process(GameEvent::ButtonPressed { side }));
-                    }
+                    envelopes.extend(self.process(GameEvent::ButtonPressed { side }));
                     return envelopes;
                 }
 

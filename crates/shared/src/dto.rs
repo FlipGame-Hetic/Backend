@@ -56,7 +56,8 @@ impl Subtopic {
             ["telemetry"] => Ok(Self::Telemetry),
             ["events"] => Ok(Self::Events),
             ["cmd"] => Ok(Self::Cmd),
-            ["status"] => Ok(Self::Status),
+            // "status" and legacy "esp32/status" (IOT firmware uses the longer path)
+            ["status"] | ["esp32", "status"] => Ok(Self::Status),
             other => {
                 let joined = other.join("/");
                 Err(TopicError::UnknownSubtopic(joined))

@@ -16,6 +16,13 @@ pub enum ButtonId {
     Start,
     #[serde(rename = "under_plunger")]
     UnderPlunger,
+    // Front-panel buttons sent by IOT firmware
+    #[serde(rename = "top")]
+    Top,
+    #[serde(rename = "middle")]
+    Middle,
+    #[serde(rename = "bottom")]
+    Bottom,
 }
 
 // Collision object types
