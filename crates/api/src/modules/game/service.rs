@@ -151,9 +151,7 @@ impl<'a> GameService<'a> {
         }
 
         let mut engine = GameEngine::new(character_id);
-        let envelopes = engine.process(game_logic::GameEvent::StartGame {
-            player_id: String::new(),
-        });
+        let envelopes = engine.process(game_logic::GameEvent::StartGame);
         let state_snapshot = engine.take_snapshot();
 
         *engine_guard = Some(engine);

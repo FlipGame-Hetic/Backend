@@ -125,15 +125,7 @@ impl GameEngine {
 
     pub fn handle_screen_event(&mut self, envelope: &ScreenEnvelope) -> Vec<ScreenEnvelope> {
         let event = match &envelope.event_type {
-            ScreenEventType::StartGame => {
-                let player_id = envelope
-                    .payload
-                    .get("player_id")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("unknown")
-                    .to_owned();
-                GameEvent::StartGame { player_id }
-            }
+            ScreenEventType::StartGame => GameEvent::StartGame,
             ScreenEventType::EndGame => GameEvent::EndGame,
             ScreenEventType::BallLost => GameEvent::BallLost,
             ScreenEventType::BallSaved => GameEvent::BallSaved,
@@ -198,9 +190,8 @@ impl GameEngine {
         let mut envelopes = Vec::new();
 
         match event {
-            GameEvent::StartGame { ref player_id } => {
+            GameEvent::StartGame => {
                 self.state = GameState::new(DEFAULT_LIVES);
-                self.state.player_id = player_id.clone();
                 self.state.phase = GamePhase::InGame;
                 self.state.session_start = Some(now);
                 self.timer_bonus_given = false;
@@ -526,7 +517,6 @@ impl GameEngine {
         let mut payload = serde_json::json!({
             "score": self.state.score,
             "multiplier": current_multiplier,
-            "player": self.state.player_id,
             "ball": ball,
         });
         if let Some(bid) = ball_id {
@@ -597,9 +587,7 @@ mod tests {
 
     fn started_engine() -> GameEngine {
         let mut engine = GameEngine::new(1);
-        engine.process(GameEvent::StartGame {
-            player_id: "test".into(),
-        });
+        engine.process(GameEvent::StartGame);
         engine
     }
 
