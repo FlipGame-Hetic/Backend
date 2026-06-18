@@ -30,9 +30,7 @@ pub async fn start_game(
     State(state): State<AppState>,
     axum::Json(body): axum::Json<StartGameRequest>,
 ) -> Result<impl IntoResponse, ApiError> {
-    let snapshot = GameService::new(&state)
-        .start(body.player_id, body.character_id)
-        .await?;
+    let snapshot = GameService::new(&state).start(body.character_id).await?;
 
     Ok((
         StatusCode::OK,
@@ -95,13 +93,9 @@ mod tests {
         AppState::new(b"flipper-dev-secret-change-in-prod".to_vec(), pool)
     }
 
-    fn start_body(player_id: &str, character_id: u8) -> Body {
+    fn start_body(character_id: u8) -> Body {
         Body::from(
-            serde_json::to_vec(&serde_json::json!({
-                "player_id": player_id,
-                "character_id": character_id
-            }))
-            .unwrap(),
+            serde_json::to_vec(&serde_json::json!({ "character_id": character_id })).unwrap(),
         )
     }
 
@@ -141,7 +135,7 @@ mod tests {
         let state = test_state().await;
         let app = router().with_state(state);
 
-        let (status, body) = post(app, "/api/v1/game/start", start_body("alice", 1)).await;
+        let (status, body) = post(app, "/api/v1/game/start", start_body(1)).await;
 
         assert_eq!(status, StatusCode::OK);
         assert_eq!(body["phase"], "in_game");
@@ -152,10 +146,10 @@ mod tests {
         let state = test_state().await;
         let app = router().with_state(state);
 
-        let (s1, _) = post(app.clone(), "/api/v1/game/start", start_body("bob", 1)).await;
+        let (s1, _) = post(app.clone(), "/api/v1/game/start", start_body(1)).await;
         assert_eq!(s1, StatusCode::OK);
 
-        let (s2, body) = post(app, "/api/v1/game/start", start_body("bob", 1)).await;
+        let (s2, body) = post(app, "/api/v1/game/start", start_body(1)).await;
         assert_eq!(s2, StatusCode::CONFLICT);
         assert_eq!(body["error"], "conflict");
     }
@@ -175,7 +169,7 @@ mod tests {
         let state = test_state().await;
         let app = router().with_state(state);
 
-        let (s, _) = post(app.clone(), "/api/v1/game/start", start_body("carol", 2)).await;
+        let (s, _) = post(app.clone(), "/api/v1/game/start", start_body(2)).await;
         assert_eq!(s, StatusCode::OK);
 
         let (status, body) = get(app, "/api/v1/game/state").await;
@@ -198,7 +192,7 @@ mod tests {
         let state = test_state().await;
         let app = router().with_state(state);
 
-        let (s, _) = post(app.clone(), "/api/v1/game/start", start_body("dave", 1)).await;
+        let (s, _) = post(app.clone(), "/api/v1/game/start", start_body(1)).await;
         assert_eq!(s, StatusCode::OK);
 
         let (s_end, body_end) = post(app.clone(), "/api/v1/game/end", Body::empty()).await;

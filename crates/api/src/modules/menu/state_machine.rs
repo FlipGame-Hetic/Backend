@@ -20,7 +20,6 @@ pub enum MenuPhase {
 pub enum MenuResult {
     Envelopes(Vec<ScreenEnvelope>),
     StartGame {
-        player_id: String,
         character_id: u8,
         envelopes: Vec<ScreenEnvelope>,
     },
@@ -138,7 +137,6 @@ impl MenuStateMachine {
                 self.phase = MenuPhase::Idle;
                 self.cursor = 0;
                 MenuResult::StartGame {
-                    player_id: "player1".to_owned(),
                     character_id,
                     envelopes: vec![make_menu_envelope(
                         ScreenEventType::GameBegin,

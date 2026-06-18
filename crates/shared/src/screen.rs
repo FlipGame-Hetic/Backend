@@ -128,6 +128,7 @@ pub enum ScreenEventType {
     CapacityL2,
     CapacityR2,
     PlungerCharge,
+    LeaderboardUpdate,
     /// Extension / test events that are not part of the known protocol.
     Unknown(String),
 }
@@ -185,6 +186,7 @@ impl ScreenEventType {
             Self::CapacityL2 => "CapacityL2",
             Self::CapacityR2 => "CapacityR2",
             Self::PlungerCharge => "PlungerCharge",
+            Self::LeaderboardUpdate => "LeaderboardUpdate",
             Self::Unknown(s) => s.as_str(),
         }
     }
@@ -249,6 +251,7 @@ impl From<String> for ScreenEventType {
             "CapacityL2" => Self::CapacityL2,
             "CapacityR2" => Self::CapacityR2,
             "PlungerCharge" => Self::PlungerCharge,
+            "LeaderboardUpdate" => Self::LeaderboardUpdate,
             _ => Self::Unknown(s),
         }
     }

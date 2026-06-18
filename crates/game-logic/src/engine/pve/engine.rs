@@ -33,7 +33,7 @@ impl PveEngine {
         let mut extra_events = Vec::new();
 
         match event {
-            GameEvent::StartGame { .. } => {
+            GameEvent::StartGame => {
                 self.reset_to_boss(0, &mut envelopes);
             }
 

@@ -67,12 +67,7 @@ async fn get_json(app: &axum::Router, path: &str) -> (StatusCode, Value) {
 async fn start_game_then_state_is_in_game() {
     let app = build_app(test_pool().await);
 
-    let (status, body) = post_json(
-        &app,
-        "/api/v1/game/start",
-        json!({ "player_id": "alice", "character_id": 1 }),
-    )
-    .await;
+    let (status, body) = post_json(&app, "/api/v1/game/start", json!({ "character_id": 1 })).await;
 
     assert_eq!(status, StatusCode::OK);
     assert_eq!(body["phase"], "in_game");
@@ -87,20 +82,10 @@ async fn start_game_then_state_is_in_game() {
 async fn double_start_returns_conflict() {
     let app = build_app(test_pool().await);
 
-    let (s1, _) = post_json(
-        &app,
-        "/api/v1/game/start",
-        json!({ "player_id": "bob", "character_id": 1 }),
-    )
-    .await;
+    let (s1, _) = post_json(&app, "/api/v1/game/start", json!({ "character_id": 1 })).await;
     assert_eq!(s1, StatusCode::OK);
 
-    let (s2, body) = post_json(
-        &app,
-        "/api/v1/game/start",
-        json!({ "player_id": "bob", "character_id": 1 }),
-    )
-    .await;
+    let (s2, body) = post_json(&app, "/api/v1/game/start", json!({ "character_id": 1 })).await;
     assert_eq!(s2, StatusCode::CONFLICT);
     assert_eq!(body["error"], "conflict");
 }
@@ -118,12 +103,7 @@ async fn state_without_game_returns_404() {
 async fn end_game_persists_score_to_db() {
     let app = build_app(test_pool().await);
 
-    let (s, _) = post_json(
-        &app,
-        "/api/v1/game/start",
-        json!({ "player_id": "carol", "character_id": 2 }),
-    )
-    .await;
+    let (s, _) = post_json(&app, "/api/v1/game/start", json!({ "character_id": 2 })).await;
     assert_eq!(s, StatusCode::OK);
 
     let (s, body) = post_json(&app, "/api/v1/game/end", json!({})).await;
@@ -133,30 +113,10 @@ async fn end_game_persists_score_to_db() {
     let (s, scores) = get_json(&app, "/api/v1/scores").await;
     assert_eq!(s, StatusCode::OK);
     assert_eq!(scores["scores"].as_array().unwrap().len(), 1);
-    assert_eq!(scores["scores"][0]["player_id"], "carol");
+    assert_eq!(scores["scores"][0]["character_id"], 2);
 }
 
-// Test 5: GET /scores/{player_id} returns player history
-#[tokio::test]
-async fn player_scores_endpoint_returns_history() {
-    let app = build_app(test_pool().await);
-
-    post_json(
-        &app,
-        "/api/v1/game/start",
-        json!({ "player_id": "dave", "character_id": 1 }),
-    )
-    .await;
-    post_json(&app, "/api/v1/game/end", json!({})).await;
-
-    let (s, body) = get_json(&app, "/api/v1/scores/dave").await;
-    assert_eq!(s, StatusCode::OK);
-    let entries = body["scores"].as_array().unwrap();
-    assert!(!entries.is_empty());
-    assert_eq!(entries[0]["player_id"], "dave");
-}
-
-// Test 6: POST /game/end when no game → 404
+// Test 5: POST /game/end when no game → 404
 #[tokio::test]
 async fn end_game_without_active_game_returns_404() {
     let app = build_app(test_pool().await);
@@ -164,7 +124,7 @@ async fn end_game_without_active_game_returns_404() {
     assert_eq!(status, StatusCode::NOT_FOUND);
 }
 
-// Test 7: Manual score save via POST /scores, then GET /scores returns it
+// Test 6: Manual score save via POST /scores, then GET /scores returns it
 #[tokio::test]
 async fn manual_save_score_appears_in_leaderboard() {
     let app = build_app(test_pool().await);
@@ -172,7 +132,7 @@ async fn manual_save_score_appears_in_leaderboard() {
     let (s, _) = post_json(
         &app,
         "/api/v1/scores",
-        json!({ "player_id": "eve", "character_id": 3, "score": 9999, "boss_reached": 2 }),
+        json!({ "character_id": 3, "score": 9999, "boss_reached": 2 }),
     )
     .await;
     assert_eq!(s, StatusCode::CREATED);
@@ -181,5 +141,52 @@ async fn manual_save_score_appears_in_leaderboard() {
     assert_eq!(s, StatusCode::OK);
     let entries = body["scores"].as_array().unwrap();
     assert_eq!(entries[0]["score"], 9999);
-    assert_eq!(entries[0]["player_id"], "eve");
+}
+
+// Test 7: Leaderboard is capped at 10 — inserting 15 scores keeps only the top 10
+#[tokio::test]
+async fn leaderboard_capped_at_10_entries() {
+    let app = build_app(test_pool().await);
+
+    for i in 0..15u64 {
+        let (s, _) = post_json(
+            &app,
+            "/api/v1/scores",
+            json!({ "character_id": 1, "score": (i + 1) * 1000, "boss_reached": 0 }),
+        )
+        .await;
+        assert!(s == StatusCode::CREATED || s == StatusCode::OK);
+    }
+
+    let (s, body) = get_json(&app, "/api/v1/scores").await;
+    assert_eq!(s, StatusCode::OK);
+    let entries = body["scores"].as_array().unwrap();
+    assert_eq!(entries.len(), 10);
+    assert_eq!(entries[0]["score"], 15000);
+}
+
+// Test 8: Score that does not beat the minimum is rejected (returns 200, not 201)
+#[tokio::test]
+async fn score_below_top10_minimum_is_rejected() {
+    let app = build_app(test_pool().await);
+
+    for i in 1..=10u64 {
+        post_json(
+            &app,
+            "/api/v1/scores",
+            json!({ "character_id": 1, "score": i * 1000, "boss_reached": 0 }),
+        )
+        .await;
+    }
+
+    let (s, _) = post_json(
+        &app,
+        "/api/v1/scores",
+        json!({ "character_id": 1, "score": 500, "boss_reached": 0 }),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+
+    let (_, body) = get_json(&app, "/api/v1/scores").await;
+    assert_eq!(body["scores"].as_array().unwrap().len(), 10);
 }

@@ -6,6 +6,8 @@ services:
       args:
         CRATE: api
     env_file: .env
+    environment:
+      DATABASE_URL: sqlite:///data/flipper.db
     ports:
       - "8080:8080"
     volumes:
