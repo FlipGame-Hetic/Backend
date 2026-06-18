@@ -2,17 +2,50 @@ use sqlx::{Row, SqlitePool};
 
 use super::dto::{SaveScoreRequest, ScoreEntry};
 
-pub async fn save_score(pool: &SqlitePool, req: SaveScoreRequest) -> Result<(), sqlx::Error> {
-    sqlx::query(
-        "INSERT INTO scores (player_id, character_id, score, boss_reached) VALUES (?, ?, ?, ?)",
-    )
-    .bind(&req.player_id)
-    .bind(req.character_id as i64)
-    .bind(req.score as i64)
-    .bind(req.boss_reached as i64)
-    .execute(pool)
-    .await?;
-    Ok(())
+const LEADERBOARD_LIMIT: i64 = 10;
+
+/// Attempts to insert `req` into the top-10 leaderboard.
+///
+/// - If the board has fewer than 10 entries, always inserts.
+/// - If the board is full, only inserts when `req.score` is strictly greater than
+///   the current minimum; the minimum entry is then deleted atomically.
+///
+/// Returns `true` when the score was persisted, `false` when it did not qualify.
+pub async fn save_score(pool: &SqlitePool, req: SaveScoreRequest) -> Result<bool, sqlx::Error> {
+    let mut tx = pool.begin().await?;
+
+    let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM scores")
+        .fetch_one(&mut *tx)
+        .await?;
+
+    if count >= LEADERBOARD_LIMIT {
+        let min_row = sqlx::query("SELECT id, score FROM scores ORDER BY score ASC LIMIT 1")
+            .fetch_one(&mut *tx)
+            .await?;
+
+        let min_id: i64 = min_row.get("id");
+        let min_score: i64 = min_row.get("score");
+
+        if req.score as i64 <= min_score {
+            tx.rollback().await?;
+            return Ok(false);
+        }
+
+        sqlx::query("DELETE FROM scores WHERE id = ?")
+            .bind(min_id)
+            .execute(&mut *tx)
+            .await?;
+    }
+
+    sqlx::query("INSERT INTO scores (character_id, score, boss_reached) VALUES (?, ?, ?)")
+        .bind(req.character_id as i64)
+        .bind(req.score as i64)
+        .bind(req.boss_reached as i64)
+        .execute(&mut *tx)
+        .await?;
+
+    tx.commit().await?;
+    Ok(true)
 }
 
 pub async fn get_leaderboard(
@@ -20,7 +53,7 @@ pub async fn get_leaderboard(
     limit: i64,
 ) -> Result<Vec<ScoreEntry>, sqlx::Error> {
     let rows = sqlx::query(
-        "SELECT id, player_id, character_id, score, boss_reached, created_at \
+        "SELECT id, character_id, score, boss_reached, created_at \
          FROM scores ORDER BY score DESC LIMIT ?",
     )
     .bind(limit)
@@ -30,25 +63,9 @@ pub async fn get_leaderboard(
     Ok(rows.into_iter().map(row_to_entry).collect())
 }
 
-pub async fn get_player_scores(
-    pool: &SqlitePool,
-    player_id: &str,
-) -> Result<Vec<ScoreEntry>, sqlx::Error> {
-    let rows = sqlx::query(
-        "SELECT id, player_id, character_id, score, boss_reached, created_at \
-         FROM scores WHERE player_id = ? ORDER BY score DESC",
-    )
-    .bind(player_id)
-    .fetch_all(pool)
-    .await?;
-
-    Ok(rows.into_iter().map(row_to_entry).collect())
-}
-
 fn row_to_entry(row: sqlx::sqlite::SqliteRow) -> ScoreEntry {
     ScoreEntry {
         id: row.get("id"),
-        player_id: row.get("player_id"),
         character_id: row.get("character_id"),
         score: row.get("score"),
         boss_reached: row.get("boss_reached"),

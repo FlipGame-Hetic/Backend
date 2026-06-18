@@ -3,7 +3,6 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize, JsonSchema)]
 pub struct StartGameRequest {
-    pub player_id: String,
     pub character_id: u8,
 }
 
