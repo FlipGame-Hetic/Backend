@@ -21,7 +21,6 @@ shared = { path = "../shared" }
 screen-hub = { path = "../screen-hub" }
 game-logic.workspace = true
 sqlx.workspace = true
-percent-encoding.workspace = true
 
 [dev-dependencies]
 tower = { version = "0.5", features = ["util"] }
