@@ -61,8 +61,29 @@ fn deserialize(subtopic: &Subtopic, payload: &[u8]) -> Result<InboundMessage> {
             Ok(InboundMessage::Event(input))
         }
         Subtopic::Status => {
-            let input: DeviceStatus = serde_json::from_slice(payload)?;
-            Ok(InboundMessage::Status(input))
+            // IOT firmware publishes plain "online"/"offline" strings as LWT/connect payload
+            match payload {
+                b"online" => Ok(InboundMessage::Status(DeviceStatus {
+                    online: true,
+                    fw_version: String::new(),
+                    ip: String::new(),
+                    free_heap: 0,
+                    vibrators_ok: vec![],
+                    gyro_ok: false,
+                })),
+                b"offline" => Ok(InboundMessage::Status(DeviceStatus {
+                    online: false,
+                    fw_version: String::new(),
+                    ip: String::new(),
+                    free_heap: 0,
+                    vibrators_ok: vec![],
+                    gyro_ok: false,
+                })),
+                _ => {
+                    let input: DeviceStatus = serde_json::from_slice(payload)?;
+                    Ok(InboundMessage::Status(input))
+                }
+            }
         }
         // Server → ESP32 topics are outbound-only, we don't deserialize them here.
         Subtopic::BallHit | Subtopic::GameState | Subtopic::Cmd => {
