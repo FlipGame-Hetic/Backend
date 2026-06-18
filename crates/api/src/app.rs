@@ -8,16 +8,23 @@ use crate::router;
 use crate::state::AppState;
 
 pub fn build(config: &ApiConfig, db_pool: SqlitePool) -> Router {
-    let cors = CorsLayer::new()
-        .allow_origin(
-            config
-                .allowed_origins
-                .iter()
-                .filter_map(|o| o.parse().ok())
-                .collect::<Vec<_>>(),
-        )
-        .allow_methods(Any)
-        .allow_headers(Any);
+    let cors = if config.allowed_origins.iter().any(|o| o == "*") {
+        CorsLayer::new()
+            .allow_origin(Any)
+            .allow_methods(Any)
+            .allow_headers(Any)
+    } else {
+        CorsLayer::new()
+            .allow_origin(
+                config
+                    .allowed_origins
+                    .iter()
+                    .filter_map(|o| o.parse().ok())
+                    .collect::<Vec<_>>(),
+            )
+            .allow_methods(Any)
+            .allow_headers(Any)
+    };
 
     let state = AppState::new(config.jwt_secret.as_bytes().to_vec(), db_pool);
 
