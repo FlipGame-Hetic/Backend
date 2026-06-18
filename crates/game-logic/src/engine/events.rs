@@ -35,9 +35,7 @@ impl From<ButtonSide> for ButtonPress {
 
 #[derive(Debug, Clone)]
 pub enum GameEvent {
-    StartGame {
-        player_id: String,
-    },
+    StartGame,
     EndGame,
     BallLaunched,
     BallLost,

@@ -32,7 +32,6 @@ dependencies = [
  "game-logic",
  "jsonwebtoken",
  "lucyd",
- "percent-encoding",
  "reqwest",
  "schemars",
  "screen-hub",

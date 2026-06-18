@@ -39,7 +39,6 @@ impl TiltState {
 pub struct GameState {
     pub phase: GamePhase,
     pub score: u64,
-    pub player_id: String,
     pub lives: u8,
     pub tilt_state: TiltState,
     pub balls_lost_since_start: u32,
@@ -57,7 +56,6 @@ impl GameState {
         Self {
             phase: GamePhase::Idle,
             score: 0,
-            player_id: String::new(),
             lives,
             tilt_state: TiltState::default(),
             balls_lost_since_start: 0,

@@ -3,7 +3,7 @@ use std::time::Duration;
 use game_logic::engine::config::RAIL_TICK_INTERVAL_MS;
 use game_logic::{GameEngine, GameEvent};
 use shared::events::InboundMessage;
-use shared::screen::{ScreenEnvelope, ScreenEventType};
+use shared::screen::{ScreenEnvelope, ScreenEventType, ScreenId, ScreenTarget};
 use thiserror::Error;
 use tracing::warn;
 
@@ -118,7 +118,6 @@ impl<'a> GameService<'a> {
             match result.session_snapshot {
                 Some(session) => {
                     let req = SaveScoreRequest {
-                        player_id: session.player_id,
                         character_id: session.character_id,
                         score: result.state_snapshot.state.score,
                         boss_reached: session.boss_reached,
@@ -126,6 +125,7 @@ impl<'a> GameService<'a> {
                     score_service::save_score(&self.state.db_pool, req)
                         .await
                         .map_err(|e| GameServiceError::Score(e.into()))?;
+                    self.broadcast_leaderboard().await;
                 }
                 None => {
                     warn!("game over fired but session was already cleared — score not persisted");
@@ -140,7 +140,6 @@ impl<'a> GameService<'a> {
     /// Fails with `AlreadyInProgress` if a session is already active.
     pub async fn start(
         &self,
-        player_id: String,
         character_id: u8,
     ) -> Result<game_logic::GameSnapshot, GameServiceError> {
         // Lock order: engine FIRST, session SECOND [§ 4.4]
@@ -152,14 +151,11 @@ impl<'a> GameService<'a> {
         }
 
         let mut engine = GameEngine::new(character_id);
-        let envelopes = engine.process(game_logic::GameEvent::StartGame {
-            player_id: player_id.clone(),
-        });
+        let envelopes = engine.process(game_logic::GameEvent::StartGame);
         let state_snapshot = engine.take_snapshot();
 
         *engine_guard = Some(engine);
         *session_guard = Some(GameSession {
-            player_id,
             character_id,
             boss_reached: 0,
         });
@@ -214,7 +210,6 @@ impl<'a> GameService<'a> {
 
         if let Some(session) = session_snapshot {
             let req = SaveScoreRequest {
-                player_id: session.player_id,
                 character_id: session.character_id,
                 score: state_snapshot.state.score,
                 boss_reached: session.boss_reached,
@@ -222,6 +217,7 @@ impl<'a> GameService<'a> {
             score_service::save_score(&self.state.db_pool, req)
                 .await
                 .map_err(|e| GameServiceError::Score(e.into()))?;
+            self.broadcast_leaderboard().await;
         }
 
         Ok(state_snapshot)
@@ -297,6 +293,33 @@ impl<'a> GameService<'a> {
         drop(engine_guard);
 
         self.dispatch_sync_and_save(result).await
+    }
+
+    /// Fetches the current top-10 leaderboard and dispatches it to `back_screen`.
+    async fn broadcast_leaderboard(&self) {
+        match score_service::get_leaderboard(&self.state.db_pool, 10).await {
+            Ok(scores) => {
+                let payload = match serde_json::to_value(&scores) {
+                    Ok(v) => v,
+                    Err(e) => {
+                        warn!(error = %e, "failed to serialize leaderboard for broadcast");
+                        return;
+                    }
+                };
+                let envelope = ScreenEnvelope {
+                    from: ScreenId::BackScreen,
+                    to: ScreenTarget::Screen {
+                        id: ScreenId::BackScreen,
+                    },
+                    event_type: ScreenEventType::LeaderboardUpdate,
+                    payload,
+                };
+                let _ = self.state.screen_router.dispatch(envelope).await;
+            }
+            Err(e) => {
+                warn!(error = %e, "failed to fetch leaderboard for broadcast");
+            }
+        }
     }
 
     /// Process an event originating from a screen WebSocket.

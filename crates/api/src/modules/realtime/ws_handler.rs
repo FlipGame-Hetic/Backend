@@ -117,14 +117,13 @@ async fn process_inbound(state: &AppState, payload: &shared::events::InboundMess
                     return;
                 }
                 crate::modules::menu::state_machine::MenuResult::StartGame {
-                    player_id,
                     character_id,
                     envelopes,
                 } => {
                     for env in envelopes {
                         let _ = state.screen_router.dispatch(env).await;
                     }
-                    if let Err(e) = GameService::new(state).start(player_id, character_id).await {
+                    if let Err(e) = GameService::new(state).start(character_id).await {
                         error!(error = %e, "failed to start game from menu");
                     }
                     return;

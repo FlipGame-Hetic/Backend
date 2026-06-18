@@ -23,6 +23,7 @@ crates/
 ├── screen-hub/     # Bidirectional relay Frontend apps <-> Backend
 └── shared/         # Types, events, DTOs shared across crates
 ```
+
 ## Quickstart
 
 ```bash
@@ -41,12 +42,41 @@ docker compose up -d mosquitto        # Broker only (for MQTT Explorer)
 ```bash
 rustup default stable       # Rust 1.89+
 cargo build                 # Build workspace
-cargo test                  # 16 tests (shared + api + bridge)
+cargo test                  # 158 tests (api + game-logic + screen-hub + mqtt-bridge + shared)
 ```
 Documentation of the codebase:
 ```bash
 cargo doc --open
 ```
+
+## Environment variables
+
+| Variable           | Required | Default                      | Description                                        |
+|--------------------|----------|------------------------------|----------------------------------------------------|
+| `SCREEN_JWT_SECRET`| **yes**  | —                            | JWT signing secret (min 32 chars)                  |
+| `DATABASE_URL`     | no       | `sqlite:///data/flipper.db`  | SQLite database path                               |
+| `API_PORT`         | no       | `8080`                       | HTTP listen port                                   |
+| `ALLOWED_ORIGINS`  | no       | `http://localhost:3000`      | Comma-separated CORS allowed origins               |
+
+## REST API
+
+| Method | Path                | Description                                                  |
+|--------|---------------------|--------------------------------------------------------------|
+| `GET`  | `/health`           | Liveness probe                                               |
+| `POST` | `/api/v1/game/start`| Start a new game session (`{ character_id: u8 }`)           |
+| `GET`  | `/api/v1/game/state`| Current game state (404 if no game running)                  |
+| `POST` | `/api/v1/game/end`  | Force-end current game and persist the final score           |
+| `GET`  | `/api/v1/scores`    | Top-10 all-time leaderboard (sorted by score desc)           |
+| `POST` | `/api/v1/scores`    | Debug: attempt to insert a score into the leaderboard        |
+| `GET`  | `/docs`             | Interactive OpenAPI docs (Lucyd UI)                          |
+
+### Leaderboard logic
+
+Scores are stored in SQLite (`scores` table). The board is capped at **10 entries**:
+- If fewer than 10 entries exist, every score is inserted.
+- If the board is full, the score must be **strictly greater** than the current minimum to be accepted; the minimum entry is then evicted atomically.
+- The leaderboard is automatically broadcast to `back_screen` via a `LeaderboardUpdate` WebSocket envelope at the end of every game.
+
 ## How to run the tests (with Cargo)
 
 Installation
@@ -61,7 +91,7 @@ HTML report + Tab of the coverage
 ```
 cargo llvm-cov --html
 ```
-(Last testing 15/04/2026: ~61.5% codecoverage)
+(Last tested 18/06/2026: ~68.55% code coverage)
 
 
 ## Tech stack
@@ -104,6 +134,15 @@ All frontend screens (`front_screen`, `back_screen`, `dmd_screen`) connect to th
 | `event_type` | `string`                      | Free-form event name (e.g. `game_state_update`)          |
 | `payload`    | `any JSON`                    | Arbitrary data, no fixed schema (intentionally flexible) |
 
+### Known event types
+
+| `event_type`        | Direction          | Description                                              |
+|---------------------|--------------------|----------------------------------------------------------|
+| `game_state_update` | server → screen    | Current game state snapshot                              |
+| `game_over`         | server → screen    | Game ended                                               |
+| `boss_defeated`     | server → screen    | A boss was defeated                                      |
+| `leaderboard_update`| server → back_screen | Top-10 leaderboard payload, broadcast after each game  |
+
 ### How it flows
 
 ```
@@ -140,7 +179,7 @@ Images are automatically built and pushed to `ghcr.io/flipgame-hetic/backend` on
 
 ---
 
-Inbound: `input/button`, `input/plunger`, `input/gyro`, `telemetry`, `events`, `status`
+Inbound: `input/button`, `input/under_plunger`, `input/plunger`, `input/gyro`, `telemetry`, `events`, `status`
 
 ---
 Outbound: `ball/hit`, `game/state`, `cmd`
