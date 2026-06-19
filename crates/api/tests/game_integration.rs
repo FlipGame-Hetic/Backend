@@ -67,7 +67,12 @@ async fn get_json(app: &axum::Router, path: &str) -> (StatusCode, Value) {
 async fn start_game_then_state_is_in_game() {
     let app = build_app(test_pool().await);
 
-    let (status, body) = post_json(&app, "/api/v1/game/start", json!({ "character_id": 1 })).await;
+    let (status, body) = post_json(
+        &app,
+        "/api/v1/game/start",
+        json!({ "character": "enforcer" }),
+    )
+    .await;
 
     assert_eq!(status, StatusCode::OK);
     assert_eq!(body["phase"], "in_game");
@@ -82,10 +87,10 @@ async fn start_game_then_state_is_in_game() {
 async fn double_start_returns_conflict() {
     let app = build_app(test_pool().await);
 
-    let (s1, _) = post_json(&app, "/api/v1/game/start", json!({ "character_id": 1 })).await;
+    let (s1, _) = post_json(&app, "/api/v1/game/start", json!({ "character": "viper" })).await;
     assert_eq!(s1, StatusCode::OK);
 
-    let (s2, body) = post_json(&app, "/api/v1/game/start", json!({ "character_id": 1 })).await;
+    let (s2, body) = post_json(&app, "/api/v1/game/start", json!({ "character": "viper" })).await;
     assert_eq!(s2, StatusCode::CONFLICT);
     assert_eq!(body["error"], "conflict");
 }
@@ -99,11 +104,12 @@ async fn state_without_game_returns_404() {
 }
 
 // Test 4: POST /game/end saves score and GET /scores returns entry
+// ghost → db_id 2, same as the old Hacker=2 slot
 #[tokio::test]
 async fn end_game_persists_score_to_db() {
     let app = build_app(test_pool().await);
 
-    let (s, _) = post_json(&app, "/api/v1/game/start", json!({ "character_id": 2 })).await;
+    let (s, _) = post_json(&app, "/api/v1/game/start", json!({ "character": "ghost" })).await;
     assert_eq!(s, StatusCode::OK);
 
     let (s, body) = post_json(&app, "/api/v1/game/end", json!({})).await;
@@ -113,7 +119,7 @@ async fn end_game_persists_score_to_db() {
     let (s, scores) = get_json(&app, "/api/v1/scores").await;
     assert_eq!(s, StatusCode::OK);
     assert_eq!(scores["scores"].as_array().unwrap().len(), 1);
-    assert_eq!(scores["scores"][0]["character_id"], 2);
+    assert_eq!(scores["scores"][0]["character_id"], 2); // ghost → db_id 2
 }
 
 // Test 5: POST /game/end when no game → 404
@@ -189,4 +195,20 @@ async fn score_below_top10_minimum_is_rejected() {
 
     let (_, body) = get_json(&app, "/api/v1/scores").await;
     assert_eq!(body["scores"].as_array().unwrap().len(), 10);
+}
+
+// Test 9: GET /characters returns 4 entries with expected slugs
+#[tokio::test]
+async fn get_characters_returns_roster() {
+    let app = build_app(test_pool().await);
+
+    let (status, body) = get_json(&app, "/api/v1/characters").await;
+    assert_eq!(status, StatusCode::OK);
+    let arr = body.as_array().expect("should be a JSON array");
+    assert_eq!(arr.len(), 4);
+    let ids: Vec<&str> = arr.iter().map(|c| c["id"].as_str().unwrap()).collect();
+    assert!(ids.contains(&"enforcer"));
+    assert!(ids.contains(&"viper"));
+    assert!(ids.contains(&"ghost"));
+    assert!(ids.contains(&"oracle"));
 }

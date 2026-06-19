@@ -22,9 +22,9 @@ pub const TILT_PENALTY_1: i64 = -2_000;
 pub const TILT_PENALTY_2: i64 = -6_000;
 
 // Boss HP
-pub const BOSS_0_HP: u32 = 42_000;
-pub const BOSS_1_HP: u32 = 256_000;
-pub const BOSS_2_HP: u32 = 1_024_000;
+pub const BOSS_0_HP: u32 = 64_000;
+pub const BOSS_1_HP: u32 = 128_000;
+pub const BOSS_2_HP: u32 = 512_000;
 
 // Boss difficulty scaling
 pub const BOSS_0_DIFFICULTY_SCALE: f32 = 1.0;
@@ -58,22 +58,26 @@ pub const COMBO_14_BONUS: u32 = 2_000;
 pub const COMBO_15_BONUS: u32 = 2_000;
 pub const COMBO_16_BONUS: u32 = 2_000;
 
-// Character stats
-pub const ROBOCP_ULTIMATE_MAX: u32 = 500;
-pub const ROBOCP_BONUS_COOLDOWN_MS: u64 = 30_000;
-pub const ROBOCP_MALUS_COOLDOWN_MS: u64 = 45_000;
+// Enforcer (KEENU) — multiball_split (instant)
+pub const ENFORCER_CHARGE_MAX: u32 = 256;
+pub const ENFORCER_WEIGHT_BUMPER: f32 = 1.0;
+pub const ENFORCER_WEIGHT_RAIL: f32 = 0.3; // rampes sous-pondérées
+pub const ENFORCER_WEIGHT_COMBO: f32 = 1.0;
+pub const ENFORCER_WEIGHT_OTHER: f32 = 1.0;
 
-pub const DREDD_ULTIMATE_MAX: u32 = 400;
-pub const DREDD_BONUS_COOLDOWN_MS: u64 = 25_000;
-pub const DREDD_MALUS_COOLDOWN_MS: u64 = 35_000;
+// Viper (VIPER) — rampage (sustained 8s, non-cancellable)
+pub const VIPER_CHARGE_MAX: u32 = 288;
+pub const VIPER_ULTI_DURATION_MS: u64 = 8_000;
+pub const VIPER_RAMPAGE_MULTIPLIER: f32 = 5.0;
 
-pub const HACKER_ULTIMATE_MAX: u32 = 300;
-pub const HACKER_BONUS_COOLDOWN_MS: u64 = 20_000;
-pub const HACKER_MALUS_COOLDOWN_MS: u64 = 30_000;
+// Ghost (GHOST) — mimic (inherited)
+pub const GHOST_CHARGE_MAX: u32 = 240;
 
-pub const CYBORG_ULTIMATE_MAX: u32 = 450;
-pub const CYBORG_BONUS_COOLDOWN_MS: u64 = 28_000;
-pub const CYBORG_MALUS_COOLDOWN_MS: u64 = 40_000;
+// Oracle (ORACLE) — time_slow (sustained 5s, cancellable)
+pub const ORACLE_CHARGE_MAX: u32 = 192;
+pub const ORACLE_ULTI_DURATION_MS: u64 = 5_000;
+pub const ORACLE_SLOW_FACTOR: f32 = 0.25;
+pub const ORACLE_TIME_RATE: f32 = 1.0; // ~1 charge unit/second
 
 // Streak multiplier (triggers on rapid successive scoring events)
 pub const STREAK_WINDOW_MS: u64 = 2_000;
@@ -98,17 +102,3 @@ pub const BOSS_DEATH_ANIM_MS: u64 = 3_000;
 pub const BOSS_COOLDOWN_MS: u64 = 10_000;
 /// Interval at which the service layer ticks the PVE engine for cooldown transitions.
 pub const PVE_TICK_INTERVAL_MS: u64 = 250;
-
-// Skill effects
-pub const SKILL_SHIELD_DURATION_MS: u64 = 8_000;
-
-pub const SKILL_DAMAGE_BOOST_MULTIPLIER: f32 = 2.0;
-pub const SKILL_DAMAGE_BOOST_DURATION_MS: u64 = 5_000;
-
-pub const SKILL_COMBO_MULTIPLIER_FACTOR: f32 = 3.0;
-pub const SKILL_COMBO_MULTIPLIER_DURATION_MS: u64 = 8_000;
-
-pub const SKILL_EXTRA_FLIPPERS_DURATION_MS: u64 = 6_000;
-pub const SKILL_TIME_SLOWDOWN_DURATION_MS: u64 = 5_000;
-pub const SKILL_FREEZE_DURATION_MS: u64 = 3_000;
-pub const SKILL_PORTAL_BONUS_PTS: u32 = 1_000;

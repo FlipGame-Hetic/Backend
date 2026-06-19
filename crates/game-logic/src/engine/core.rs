@@ -1,19 +1,31 @@
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use shared::events::InboundMessage;
 use shared::model::ButtonId;
 use shared::screen::{ScreenEnvelope, ScreenEventType, ScreenId, ScreenTarget};
 
 use crate::combo::{ComboDetector, ComboResult, MultiplierState, StreakState};
-use crate::engine::config::{DEFAULT_LIVES, ULTIME_CHARGE_RATIO};
+use crate::engine::config::{
+    DEFAULT_LIVES, ORACLE_SLOW_FACTOR, ORACLE_ULTI_DURATION_MS, PVE_TICK_INTERVAL_MS,
+    ULTIME_CHARGE_RATIO, VIPER_RAMPAGE_MULTIPLIER, VIPER_ULTI_DURATION_MS,
+};
 use crate::engine::events::{ButtonSide, GameEvent, GameOverReason};
 use crate::engine::pve::PveEngine;
 use crate::engine::scoring::{
     apply_tilt_penalty, rail_tick_score, score_bumper, score_bumper_triangle, timer_bonus,
 };
 use crate::engine::states::{GamePhase, GameState, TiltEffect};
-use crate::player::personnages::character::{Character, select_character};
-use crate::player::skills::player_bonus::SkillEffect;
+use crate::player::personnages::character::{Character, UltiShape, select_character};
+
+/// Ghost cycles through these ulti IDs in order (index mod 3).
+const GHOST_CYCLE: [&str; 3] = ["multiball_split", "rampage", "time_slow"];
+
+enum ChargeSource {
+    Bumper,
+    Rail,
+    Combo,
+    Other,
+}
 
 pub struct GameEngine {
     pub state: GameState,
@@ -26,19 +38,26 @@ pub struct GameEngine {
 }
 
 impl GameEngine {
-    pub fn new(character_id: u8) -> Self {
+    pub fn new(character_slug: &str) -> Self {
         Self {
             state: GameState::new(DEFAULT_LIVES),
             combo_detector: ComboDetector::new(),
             multiplier: MultiplierState::new(),
             streak: StreakState::new(),
             pve_engine: PveEngine::new(),
-            character: select_character(character_id),
+            character: select_character(character_slug),
             timer_bonus_given: false,
         }
     }
 
     fn effective_multiplier(&self, now: Instant) -> f32 {
+        // During Viper rampage (or Ghost-copied rampage), override multiplier to exactly N.
+        // The override ignores streak so rampage × streak stacking doesn't happen.
+        if self.state.is_ulti_active(now)
+            && let Some(override_mult) = self.state.ulti_multiplier_override
+        {
+            return override_mult;
+        }
         self.multiplier.current(now) * self.streak.current()
     }
 
@@ -53,16 +72,38 @@ impl GameEngine {
     }
 
     /// Tick the PVE engine for cooldown/transition progression.
-    ///
-    /// Must be called periodically by the service layer while a game is in progress.
-    /// Returns envelopes produced by boss cooldown state transitions.
+    /// Also advances time-based character charge (Oracle).
     pub fn pve_tick(&mut self, now: Instant) -> Vec<ScreenEnvelope> {
+        self.tick_time_charge(now);
+
         let (envelopes, extra) = self.pve_engine.tick(now);
         let mut all = envelopes;
         for e in extra {
             all.extend(self.process(e));
         }
         all
+    }
+
+    fn tick_time_charge(&mut self, now: Instant) {
+        let time_rate = self.character.stats().charge_profile.time_rate;
+        if time_rate <= 0.0
+            || self.state.phase != GamePhase::InGame
+            || self.state.is_ulti_active(now)
+        {
+            return;
+        }
+        let delta_s = PVE_TICK_INTERVAL_MS as f32 / 1000.0;
+        self.state.time_charge_buffer += time_rate * delta_s;
+        let to_add = self.state.time_charge_buffer.floor() as u32;
+        if to_add > 0 {
+            self.state.time_charge_buffer -= to_add as f32;
+            let charge_max = self.character.stats().charge_profile.charge_max;
+            self.state.ultimate_charge = self
+                .state
+                .ultimate_charge
+                .saturating_add(to_add)
+                .min(charge_max);
+        }
     }
 
     pub fn take_snapshot(&self) -> crate::GameSnapshot {
@@ -100,17 +141,9 @@ impl GameEngine {
 
                 if self.state.phase == GamePhase::InGame {
                     match btn.id {
-                        ButtonId::L2 if btn.state > 0 => {
-                            return vec![make_event_envelope(
-                                ScreenEventType::CapacityL2,
-                                serde_json::Value::Null,
-                            )];
-                        }
-                        ButtonId::R2 if btn.state > 0 => {
-                            return vec![make_event_envelope(
-                                ScreenEventType::CapacityR2,
-                                serde_json::Value::Null,
-                            )];
+                        ButtonId::L2 | ButtonId::R2 if btn.state > 0 => {
+                            let now = Instant::now();
+                            return self.process_ulti_press(now);
                         }
                         ButtonId::UnderPlunger => {
                             let mut envelopes = vec![make_event_envelope(
@@ -143,14 +176,11 @@ impl GameEngine {
             ScreenEventType::BallLost => GameEvent::BallLost,
             ScreenEventType::BallSaved => GameEvent::BallSaved,
             ScreenEventType::LifeUp => GameEvent::LifeUp,
-            ScreenEventType::UltimateActivated => {
-                let player_id = envelope
-                    .payload
-                    .get("player_id")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("unknown")
-                    .to_owned();
-                GameEvent::UltimateActivated { player_id }
+            // UltimateActivated is no longer the activation path.
+            // L2/R2 is the authoritative trigger. Ignore this event to avoid the old ping-pong.
+            ScreenEventType::UltimateActivated => return vec![],
+            ScreenEventType::CapacityL2 | ScreenEventType::CapacityR2 => {
+                return self.process_ulti_press(Instant::now());
             }
             ScreenEventType::Bumper => {
                 let ball_id = envelope
@@ -201,6 +231,9 @@ impl GameEngine {
     pub fn process(&mut self, event: GameEvent) -> Vec<ScreenEnvelope> {
         let now = Instant::now();
         let mut envelopes = Vec::new();
+
+        // Lazily expire any sustained ulti that has run its full duration.
+        self.try_expire_ulti(now);
 
         match event {
             GameEvent::StartGame => {
@@ -300,10 +333,8 @@ impl GameEngine {
                     _ => score_bumper_triangle(current_multiplier),
                 };
                 self.state.add_score(scored);
-                self.state.ultimate_charge = self
-                    .state
-                    .ultimate_charge
-                    .saturating_add(pts / ULTIME_CHARGE_RATIO);
+                // Charge uses base_pts BEFORE multiplier, with per-character bumper weight.
+                self.add_charge(pts as u64, ChargeSource::Bumper, now);
 
                 let (pve_env, extra) = self.pve_engine.on_score_delta(scored);
                 envelopes.extend(pve_env);
@@ -331,6 +362,11 @@ impl GameEngine {
                 let (_streak_changed, streak_armed) = self.streak.record(now);
                 let pts = crate::engine::scoring::score_portal_bonus();
                 self.state.add_score(pts);
+                self.add_charge(
+                    crate::engine::config::PORTAL_SCORE as u64,
+                    ChargeSource::Other,
+                    now,
+                );
                 let (pve_env, extra) = self.pve_engine.on_score_delta(pts);
                 envelopes.extend(pve_env);
                 for e in extra {
@@ -350,6 +386,7 @@ impl GameEngine {
                 let (_streak_changed, streak_armed) = self.streak.record(now);
                 let pts = crate::engine::config::BALL_SAVER_SCORE as u64;
                 self.state.add_score(pts);
+                self.add_charge(pts, ChargeSource::Other, now);
                 let (pve_env, extra) = self.pve_engine.on_score_delta(pts);
                 envelopes.extend(pve_env);
                 for e in extra {
@@ -397,6 +434,7 @@ impl GameEngine {
                 let (_streak_changed, streak_armed) = self.streak.record(now);
                 let pts = crate::engine::config::MULTIBALL_SCORE as u64;
                 self.state.add_score(pts);
+                self.add_charge(pts, ChargeSource::Other, now);
                 let (pve_env, extra) = self.pve_engine.on_score_delta(pts);
                 envelopes.extend(pve_env);
                 for e in extra {
@@ -417,21 +455,17 @@ impl GameEngine {
                 envelopes.push(self.emit_multiplier_update(now));
             }
 
-            GameEvent::UltimateActivated { .. } => {
-                let charge_max = self.character.stats().ultimate_charge_max;
-                if self.state.ultimate_charge >= charge_max {
-                    let effect = self.character.bonus().activate(&mut self.state);
-                    self.state.ultimate_charge = 0;
-                    envelopes.extend(self.apply_skill_effect(effect));
-                }
-            }
+            // Kept in GameEvent for backward compatibility but no longer the activation path.
+            GameEvent::UltimateActivated { .. } => {}
 
             GameEvent::ComboActivated(effect) => {
                 let (_streak_changed, streak_armed) = self.streak.record(now);
                 let current_multiplier = self.effective_multiplier(now);
                 let scaled_bonus = (effect.bonus_pts as f32 * current_multiplier) as u64;
                 self.state.add_score(scaled_bonus);
-                if scaled_bonus > 0 {
+                // Charge on combo uses base bonus_pts (before multiplier).
+                if effect.bonus_pts > 0 {
+                    self.add_charge(effect.bonus_pts as u64, ChargeSource::Combo, now);
                     let (pve_env, extra) = self.pve_engine.on_score_delta(scaled_bonus);
                     envelopes.extend(pve_env);
                     for e in extra {
@@ -469,12 +503,12 @@ impl GameEngine {
                     return envelopes;
                 }
                 let bid = ball_id.clone();
-                // Rail ticks use only the active combo multiplier, not the streak.
-                // Counting each tick as a streak hit would drive the streak tier up
-                // artificially fast and produce exploding scores.
                 let current_multiplier = self.multiplier.current(now);
                 let scored = rail_tick_score(fib_step, current_multiplier);
                 self.state.add_score(scored);
+                // Charge uses base rail pts (multiplier = 1.0).
+                let base_pts = rail_tick_score(fib_step, 1.0);
+                self.add_charge(base_pts, ChargeSource::Rail, now);
                 let (pve_env, extra) = self.pve_engine.on_score_delta(scored);
                 envelopes.extend(pve_env);
                 for e in extra {
@@ -487,6 +521,185 @@ impl GameEngine {
 
         envelopes
     }
+
+    // ── Ulti state machine ────────────────────────────────────────────────────
+
+    /// Lazily expire a sustained ulti that has reached its natural end.
+    fn try_expire_ulti(&mut self, now: Instant) {
+        if let Some(ends_at) = self.state.ulti_ends_at
+            && now >= ends_at
+            && self.state.ulti_active_id.is_some()
+        {
+            self.state.ulti_ends_at = None;
+            self.state.ultimate_charge = 0;
+            self.state.ulti_active_id = None;
+            self.state.ulti_multiplier_override = None;
+        }
+    }
+
+    fn process_ulti_press(&mut self, now: Instant) -> Vec<ScreenEnvelope> {
+        let mut envelopes = Vec::new();
+
+        if self.state.is_ulti_active(now) {
+            if self.state.ulti_cancellable {
+                let charge_max = self.character.stats().charge_profile.charge_max;
+                let residual = self.state.residual_charge_with_max(now, charge_max);
+                let ulti_id = self.state.ulti_active_id.clone().unwrap_or_default();
+
+                // Expire immediately
+                self.state.ulti_ends_at = Some(now);
+                self.state.ultimate_charge = residual;
+                self.state.ulti_active_id = None;
+                self.state.ulti_multiplier_override = None;
+
+                envelopes.push(make_event_envelope(
+                    ScreenEventType::UltimateStopped,
+                    serde_json::json!({
+                        "ulti_id": ulti_id,
+                        "ultimate_charge": residual,
+                    }),
+                ));
+                envelopes.push(self.emit_score_update(None));
+            }
+            // Non-cancellable: silently ignore the press.
+        } else {
+            let charge_max = self.character.stats().charge_profile.charge_max;
+            if self.state.ultimate_charge >= charge_max {
+                envelopes.extend(self.activate_ulti(now));
+                envelopes.push(self.emit_score_update(None));
+            }
+            // Not ready: no event (optional UltimateNotReady could go here).
+        }
+
+        envelopes
+    }
+
+    fn activate_ulti(&mut self, now: Instant) -> Vec<ScreenEnvelope> {
+        let mut envelopes = Vec::new();
+        let character_slug = self.character.slug();
+
+        // Resolve ulti identity and shape.
+        let (ulti_id, shape): (&'static str, UltiShape) = if character_slug == "ghost" {
+            let idx = (self.state.ghost_cycle_index as usize) % GHOST_CYCLE.len();
+            self.state.ghost_cycle_index = self.state.ghost_cycle_index.wrapping_add(1);
+            match idx {
+                0 => ("multiball_split", UltiShape::Instant),
+                1 => (
+                    "rampage",
+                    UltiShape::Sustained {
+                        duration_ms: VIPER_ULTI_DURATION_MS,
+                        cancellable: false,
+                    },
+                ),
+                _ => (
+                    "time_slow",
+                    UltiShape::Sustained {
+                        duration_ms: ORACLE_ULTI_DURATION_MS,
+                        cancellable: true,
+                    },
+                ),
+            }
+        } else {
+            (self.character.ulti_id(), self.character.ulti_shape())
+        };
+
+        // Apply mechanics.
+        match &shape {
+            UltiShape::Instant => {
+                self.state.ultimate_charge = 0;
+                if ulti_id == "multiball_split" {
+                    self.state.multiball_active = true;
+                }
+            }
+            UltiShape::Sustained {
+                duration_ms,
+                cancellable,
+            } => {
+                self.state.ulti_ends_at = Some(now + Duration::from_millis(*duration_ms));
+                self.state.ulti_duration_ms = *duration_ms;
+                self.state.ulti_cancellable = *cancellable;
+                self.state.ulti_active_id = Some(ulti_id.to_string());
+                // Charge stays at charge_max and drains lazily.
+
+                if ulti_id == "rampage" {
+                    self.state.ulti_multiplier_override = Some(VIPER_RAMPAGE_MULTIPLIER);
+                    envelopes.push(make_event_envelope(
+                        ScreenEventType::MultiplierUpdate,
+                        serde_json::json!({
+                            "multiplier": VIPER_RAMPAGE_MULTIPLIER,
+                            "duration_ms": duration_ms,
+                        }),
+                    ));
+                }
+            }
+            UltiShape::Inherited => {
+                unreachable!("ghost always resolves to a concrete shape before this point");
+            }
+        }
+
+        // Build UltimateTriggered event.
+        let mut triggered = serde_json::json!({
+            "character": character_slug,
+            "ulti_id": ulti_id,
+        });
+        match &shape {
+            UltiShape::Instant => {
+                triggered["shape"] = serde_json::json!("instant");
+                triggered["cancellable"] = serde_json::json!(false);
+            }
+            UltiShape::Sustained {
+                duration_ms,
+                cancellable,
+            } => {
+                triggered["shape"] = serde_json::json!("sustained");
+                triggered["cancellable"] = serde_json::json!(cancellable);
+                triggered["duration_ms"] = serde_json::json!(duration_ms);
+                let payload = match ulti_id {
+                    "rampage" => serde_json::json!({ "multiplier": VIPER_RAMPAGE_MULTIPLIER }),
+                    "time_slow" => serde_json::json!({ "slow_factor": ORACLE_SLOW_FACTOR }),
+                    _ => serde_json::json!({}),
+                };
+                triggered["payload"] = payload;
+            }
+            UltiShape::Inherited => unreachable!(),
+        }
+        envelopes.push(make_event_envelope(
+            ScreenEventType::UltimateTriggered,
+            triggered,
+        ));
+
+        envelopes
+    }
+
+    // ── Charge accumulation ───────────────────────────────────────────────────
+
+    /// Accumulate ultimate charge from a scoring event.
+    /// `base_pts` is the score value BEFORE any multiplier is applied.
+    /// Charge gain is suspended while a sustained ulti is active.
+    fn add_charge(&mut self, base_pts: u64, source: ChargeSource, now: Instant) {
+        if self.state.is_ulti_active(now) {
+            return;
+        }
+        let profile = &self.character.stats().charge_profile;
+        let weight = match source {
+            ChargeSource::Bumper => profile.weight_bumper,
+            ChargeSource::Rail => profile.weight_rail,
+            ChargeSource::Combo => profile.weight_combo,
+            ChargeSource::Other => profile.weight_other,
+        };
+        let weighted = (base_pts as f32 * weight).round() as u32;
+        self.state.point_buffer = self.state.point_buffer.saturating_add(weighted);
+        let gain = self.state.point_buffer / ULTIME_CHARGE_RATIO;
+        self.state.point_buffer %= ULTIME_CHARGE_RATIO;
+        let charge_max = profile.charge_max;
+        self.state.ultimate_charge = self
+            .state
+            .ultimate_charge
+            .saturating_add(gain)
+            .min(charge_max);
+    }
+
+    // ── Helpers ───────────────────────────────────────────────────────────────
 
     fn check_timer_bonus(&mut self, now: Instant) -> Vec<ScreenEnvelope> {
         if self.timer_bonus_given {
@@ -515,50 +728,35 @@ impl GameEngine {
         vec![]
     }
 
-    fn apply_skill_effect(&mut self, effect: SkillEffect) -> Vec<ScreenEnvelope> {
-        match effect {
-            SkillEffect::ModifyMultiplier {
-                factor,
-                duration_ms,
-            } => {
-                let now = Instant::now();
-                self.multiplier.apply(factor, duration_ms, now);
-                vec![make_event_envelope(
-                    ScreenEventType::MultiplierUpdate,
-                    serde_json::json!({ "multiplier": self.effective_multiplier(now), "duration_ms": duration_ms }),
-                )]
-            }
-            SkillEffect::AddBalls { count } => vec![make_event_envelope(
-                ScreenEventType::ExtraBall,
-                serde_json::json!({ "count": count }),
-            )],
-            SkillEffect::ShieldActivated { duration_ms } => vec![make_event_envelope(
-                ScreenEventType::ShieldActivated,
-                serde_json::json!({ "duration_ms": duration_ms }),
-            )],
-            SkillEffect::AddScore { pts } => {
-                self.state.add_score(pts as u64);
-                vec![self.emit_score_update(None)]
-            }
-            SkillEffect::EmitScreenEvent {
-                event_type,
-                payload,
-            } => {
-                vec![make_event_envelope(event_type, payload)]
-            }
-            SkillEffect::NoEffect => vec![],
-        }
-    }
-
     fn emit_score_update(&self, ball_id: Option<String>) -> ScreenEnvelope {
         let now = Instant::now();
         let current_multiplier = self.effective_multiplier(now);
         let ball = self.state.balls_lost_since_start + 1;
+        let charge_max = self.character.stats().charge_profile.charge_max;
+
+        // During a sustained ulti the charge bar shows the live drain residual.
+        let displayed_charge = if self.state.is_ulti_active(now) {
+            self.state.residual_charge_with_max(now, charge_max)
+        } else {
+            self.state.ultimate_charge
+        };
+        let ulti_ready =
+            !self.state.is_ulti_active(now) && self.state.ultimate_charge >= charge_max;
+
         let mut payload = serde_json::json!({
             "score": self.state.score,
             "multiplier": current_multiplier,
             "ball": ball,
+            "ultimate_charge": displayed_charge,
+            "ultimate_max": charge_max,
+            "ulti_ready": ulti_ready,
         });
+
+        if self.character.slug() == "ghost" {
+            let next_idx = (self.state.ghost_cycle_index as usize) % GHOST_CYCLE.len();
+            payload["next_ulti_id"] = serde_json::json!(GHOST_CYCLE[next_idx]);
+        }
+
         if let Some(bid) = ball_id {
             payload["ball_id"] = serde_json::json!(bid);
         }
@@ -626,7 +824,7 @@ mod tests {
     use crate::engine::events::{GameEvent, GameOverReason};
 
     fn started_engine() -> GameEngine {
-        let mut engine = GameEngine::new(1);
+        let mut engine = GameEngine::new("enforcer");
         engine.process(GameEvent::StartGame);
         engine
     }
@@ -719,8 +917,7 @@ mod tests {
 
     #[test]
     fn rail_tick_ignored_when_not_in_game() {
-        let mut engine = GameEngine::new(1);
-        // Phase is Idle, no StartGame called.
+        let mut engine = GameEngine::new("enforcer");
         let before = engine.state.score;
         engine.process(GameEvent::RailTick {
             ball_id: None,
@@ -837,5 +1034,112 @@ mod tests {
             .find(|e| e.event_type == ScreenEventType::ScoreUpdate)
             .expect("ScoreUpdate should be emitted");
         assert!(update_env.payload.get("ball_id").is_none());
+    }
+
+    #[test]
+    fn score_update_includes_charge_fields() {
+        let mut engine = started_engine();
+        let envelopes = engine.process(GameEvent::BumperHit {
+            pts: 100,
+            ball_id: None,
+        });
+        let update = envelopes
+            .iter()
+            .find(|e| e.event_type == ScreenEventType::ScoreUpdate)
+            .expect("ScoreUpdate should be emitted");
+        assert!(update.payload.get("ultimate_charge").is_some());
+        assert!(update.payload.get("ultimate_max").is_some());
+        assert!(update.payload.get("ulti_ready").is_some());
+    }
+
+    #[test]
+    fn bumper_charge_accumulates_with_buffer() {
+        let mut engine = started_engine();
+        // Enforcer bumper weight = 1.0; ULTIME_CHARGE_RATIO = 100.
+        // 1 bumper hit = 100 pts → 100 / 100 = 1 charge unit.
+        for _ in 0..5 {
+            engine.process(GameEvent::BumperHit {
+                pts: 100,
+                ball_id: None,
+            });
+        }
+        assert!(
+            engine.state.ultimate_charge >= 5,
+            "charge should accumulate"
+        );
+    }
+
+    #[test]
+    fn viper_ulti_triggers_when_full() {
+        let mut engine = GameEngine::new("viper");
+        engine.process(GameEvent::StartGame);
+        let charge_max = engine.character.stats().charge_profile.charge_max;
+        engine.state.ultimate_charge = charge_max;
+
+        // Simulate L2/R2 press by calling process_ulti_press directly.
+        let now = Instant::now();
+        let envelopes = engine.process_ulti_press(now);
+        assert!(
+            envelopes
+                .iter()
+                .any(|e| e.event_type == ScreenEventType::UltimateTriggered),
+            "should emit UltimateTriggered"
+        );
+        assert!(
+            engine.state.is_ulti_active(Instant::now()),
+            "ulti should be active"
+        );
+        assert_eq!(engine.state.ulti_multiplier_override, Some(5.0));
+    }
+
+    #[test]
+    fn oracle_ulti_is_cancellable() {
+        let mut engine = GameEngine::new("oracle");
+        engine.process(GameEvent::StartGame);
+        let charge_max = engine.character.stats().charge_profile.charge_max;
+        engine.state.ultimate_charge = charge_max;
+
+        let now = Instant::now();
+        engine.process_ulti_press(now);
+        assert!(engine.state.is_ulti_active(Instant::now()));
+
+        let now2 = Instant::now();
+        let envelopes = engine.process_ulti_press(now2);
+        assert!(
+            envelopes
+                .iter()
+                .any(|e| e.event_type == ScreenEventType::UltimateStopped),
+            "should emit UltimateStopped on cancel"
+        );
+        assert!(
+            !engine.state.is_ulti_active(Instant::now()),
+            "ulti should be cancelled"
+        );
+    }
+
+    #[test]
+    fn ghost_cycle_advances_on_each_activation() {
+        let mut engine = GameEngine::new("ghost");
+        engine.process(GameEvent::StartGame);
+        let charge_max = engine.character.stats().charge_profile.charge_max;
+
+        for expected_ulti in &["multiball_split", "rampage", "time_slow"] {
+            engine.state.ultimate_charge = charge_max;
+            let now = Instant::now();
+            let envelopes = engine.process_ulti_press(now);
+            let triggered = envelopes
+                .iter()
+                .find(|e| e.event_type == ScreenEventType::UltimateTriggered)
+                .expect("should emit UltimateTriggered");
+            assert_eq!(
+                triggered.payload["ulti_id"],
+                serde_json::json!(expected_ulti)
+            );
+
+            // End any active sustained ulti before next loop.
+            engine.state.ulti_ends_at = Some(Instant::now());
+            engine.state.ulti_active_id = None;
+            engine.state.ulti_multiplier_override = None;
+        }
     }
 }

@@ -120,7 +120,7 @@ impl<'a> GameService<'a> {
             match result.session_snapshot {
                 Some(session) => {
                     let req = SaveScoreRequest {
-                        character_id: session.character_id,
+                        character_id: game_logic::slug_to_db_id(&session.character_slug),
                         score: result.state_snapshot.state.score,
                         boss_reached: session.boss_reached,
                     };
@@ -142,7 +142,7 @@ impl<'a> GameService<'a> {
     /// Fails with `AlreadyInProgress` if a session is already active.
     pub async fn start(
         &self,
-        character_id: u8,
+        character: String,
     ) -> Result<game_logic::GameSnapshot, GameServiceError> {
         // Lock order: engine FIRST, session SECOND [§ 4.4]
         let mut engine_guard = self.state.game_engine.lock().await;
@@ -152,13 +152,13 @@ impl<'a> GameService<'a> {
             return Err(GameServiceError::AlreadyInProgress);
         }
 
-        let mut engine = GameEngine::new(character_id);
+        let mut engine = GameEngine::new(&character);
         let envelopes = engine.process(game_logic::GameEvent::StartGame);
         let state_snapshot = engine.take_snapshot();
 
         *engine_guard = Some(engine);
         *session_guard = Some(GameSession {
-            character_id,
+            character_slug: character,
             boss_reached: 0,
         });
 
@@ -220,7 +220,7 @@ impl<'a> GameService<'a> {
 
         if let Some(session) = session_snapshot {
             let req = SaveScoreRequest {
-                character_id: session.character_id,
+                character_id: game_logic::slug_to_db_id(&session.character_slug),
                 score: state_snapshot.state.score,
                 boss_reached: session.boss_reached,
             };

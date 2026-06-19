@@ -146,13 +146,14 @@ async fn read_loop(
 async fn process_screen_event(state: &AppState, envelope: &ScreenEnvelope) {
     match &envelope.event_type {
         ScreenEventType::StartGame => {
-            let character_id = envelope
+            let character = envelope
                 .payload
-                .get("character_id")
-                .and_then(|v| v.as_u64())
-                .unwrap_or(1) as u8;
+                .get("character")
+                .and_then(|v| v.as_str())
+                .unwrap_or("enforcer")
+                .to_string();
 
-            match GameService::new(state).start(character_id).await {
+            match GameService::new(state).start(character).await {
                 Ok(_) => {}
                 Err(GameServiceError::AlreadyInProgress) => {
                     warn!("StartGame ignored — game already in progress");

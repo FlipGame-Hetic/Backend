@@ -17,7 +17,7 @@ pub struct RailSessionKey {
 /// Identifies the current player session between StartGame and GameOver.
 #[derive(Debug, Clone)]
 pub struct GameSession {
-    pub character_id: u8,
+    pub character_slug: String,
     pub boss_reached: u8,
 }
 

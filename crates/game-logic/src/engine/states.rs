@@ -45,10 +45,28 @@ pub struct GameState {
     pub session_start: Option<Instant>,
     pub cheating_detected: bool,
     pub extra_balls: u8,
-    pub ultimate_charge: u32,
     pub shield_active: bool,
     pub shield_expires_at: Option<Instant>,
     pub damage_multiplier: f32,
+    pub multiball_active: bool,
+
+    // Ultimate charge
+    pub ultimate_charge: u32,
+    /// Sub-100-point remainder carried over between scoring events.
+    pub point_buffer: u32,
+    /// Fractional accumulator for time-based charge (Oracle).
+    pub time_charge_buffer: f32,
+
+    // Ulti state machine (lazy eval — no timers)
+    pub ulti_ends_at: Option<Instant>,
+    pub ulti_duration_ms: u64,
+    pub ulti_cancellable: bool,
+    pub ulti_active_id: Option<String>,
+    /// Forces `effective_multiplier` to exactly this value while ulti is active (Viper).
+    pub ulti_multiplier_override: Option<f32>,
+
+    // Ghost cycle (reset on StartGame)
+    pub ghost_cycle_index: u8,
 }
 
 impl GameState {
@@ -62,10 +80,19 @@ impl GameState {
             session_start: None,
             cheating_detected: false,
             extra_balls: 0,
-            ultimate_charge: 0,
             shield_active: false,
             shield_expires_at: None,
             damage_multiplier: 1.0,
+            multiball_active: false,
+            ultimate_charge: 0,
+            point_buffer: 0,
+            time_charge_buffer: 0.0,
+            ulti_ends_at: None,
+            ulti_duration_ms: 0,
+            ulti_cancellable: false,
+            ulti_active_id: None,
+            ulti_multiplier_override: None,
+            ghost_cycle_index: 0,
         }
     }
 
@@ -79,6 +106,35 @@ impl GameState {
         if penalty < 0 {
             self.score = self.score.saturating_sub(penalty.unsigned_abs());
         }
+    }
+
+    pub fn is_ulti_active(&self, now: Instant) -> bool {
+        self.ulti_ends_at.map(|t| now < t).unwrap_or(false)
+    }
+
+    /// Remaining charge at `now` during a sustained ulti (linear drain).
+    pub fn residual_charge(&self, now: Instant) -> u32 {
+        let Some(ends_at) = self.ulti_ends_at else {
+            return 0;
+        };
+        if now >= ends_at || self.ulti_duration_ms == 0 {
+            return 0;
+        }
+        // We can't store charge_max here, so callers pass it.
+        // This method only computes the fraction; the caller multiplies by charge_max.
+        // Keep it simple: store nothing extra — callers use residual_charge_with_max.
+        0
+    }
+
+    pub fn residual_charge_with_max(&self, now: Instant, charge_max: u32) -> u32 {
+        let Some(ends_at) = self.ulti_ends_at else {
+            return 0;
+        };
+        if now >= ends_at || self.ulti_duration_ms == 0 {
+            return 0;
+        }
+        let remaining_ms = ends_at.duration_since(now).as_millis() as u64;
+        ((charge_max as u64 * remaining_ms) / self.ulti_duration_ms) as u32
     }
 }
 

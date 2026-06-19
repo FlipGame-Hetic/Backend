@@ -6,7 +6,7 @@ pub use combo::{ComboDetector, ComboEffect, ComboResult};
 pub use engine::core::GameEngine;
 pub use engine::events::{ButtonSide, GameEvent, GameOverReason};
 pub use engine::states::{GamePhase, GameState};
-pub use player::personnages::character::{Character, select_character};
+pub use player::personnages::character::{Character, UltiShape, select_character, slug_to_db_id};
 
 /// Aggregated view of the engine for the HTTP layer.
 ///
