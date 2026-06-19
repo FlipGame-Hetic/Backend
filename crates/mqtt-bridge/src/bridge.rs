@@ -128,6 +128,13 @@ async fn mqtt_inbound_loop(
                 let topic = &publish.topic;
                 let payload = &publish.payload;
 
+                info!(
+                    topic = %topic,
+                    payload_len = payload.len(),
+                    payload_utf8 = %String::from_utf8_lossy(payload),
+                    "[MQTT ←] received publish from broker"
+                );
+
                 match handler::handle_publish(topic, payload) {
                     Ok(handled) => {
                         let ws_msg = WsMessage::Inbound {
@@ -170,7 +177,7 @@ where
     while let Some(msg) = rx.recv().await {
         let json = serde_json::to_string(&msg)?;
 
-        debug!(len = json.len(), "Sending to central API");
+        info!(len = json.len(), payload = %json, "[WS →] sending to API");
 
         sink.send(WsRawMessage::Text(json.into())).await?;
     }
@@ -214,8 +221,12 @@ where
         };
 
         match ws_msg {
-            WsMessage::Outbound { device_id, payload } => {
-                if let Err(e) = publish_outbound(&mqtt_client, &device_id, &payload).await {
+            WsMessage::Outbound {
+                device_id,
+                ref payload,
+            } => {
+                info!(device_id = %device_id, payload = ?payload, "[WS ←] received outbound from API");
+                if let Err(e) = publish_outbound(&mqtt_client, &device_id, payload).await {
                     warn!(device_id, error = %e, "Failed to publish outbound to MQTT");
                 }
             }
@@ -254,11 +265,11 @@ async fn publish_outbound(
         .publish(&topic_str, QoS::AtLeastOnce, retain, bytes)
         .await?;
 
-    debug!(
+    info!(
         topic = %topic_str,
         device_id,
         retain,
-        "Published outbound to mqtt"
+        "[MQTT →] published to broker"
     );
 
     Ok(())
