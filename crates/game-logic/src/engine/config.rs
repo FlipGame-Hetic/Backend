@@ -91,6 +91,14 @@ pub const RAIL_BASE_SCORE: u32 = 4;
 /// fib(10) = 89 → 890 pts/tick at ×1 multiplier, which is a sane ceiling.
 pub const RAIL_MAX_FIB_STEP: u32 = 7;
 
+// Boss transition timing
+/// Delay after BossDefeated before BossCleared is emitted (death animation window).
+pub const BOSS_DEATH_ANIM_MS: u64 = 3_000;
+/// Cooldown between BossCleared and the next BossUpdate (score-only phase).
+pub const BOSS_COOLDOWN_MS: u64 = 10_000;
+/// Interval at which the service layer ticks the PVE engine for cooldown transitions.
+pub const PVE_TICK_INTERVAL_MS: u64 = 250;
+
 // Skill effects
 pub const SKILL_SHIELD_DURATION_MS: u64 = 8_000;
 

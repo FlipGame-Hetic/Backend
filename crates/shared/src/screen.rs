@@ -12,6 +12,9 @@ pub enum ScreenId {
     FrontScreen,
     BackScreen,
     DmdScreen,
+    /// Virtual sender for game-logic events. Never registered as a real screen,
+    /// so broadcasts from this id are delivered to all connected screens without exclusion.
+    GameEngine,
 }
 
 impl ScreenId {
@@ -20,6 +23,7 @@ impl ScreenId {
             Self::FrontScreen => "front_screen",
             Self::BackScreen => "back_screen",
             Self::DmdScreen => "dmd_screen",
+            Self::GameEngine => "game_engine",
         }
     }
 
@@ -54,6 +58,7 @@ impl FromStr for ScreenId {
             "front_screen" | "front-screen" => Ok(Self::FrontScreen),
             "back_screen" | "back-screen" => Ok(Self::BackScreen),
             "dmd_screen" | "dmd-screen" => Ok(Self::DmdScreen),
+            "game_engine" => Ok(Self::GameEngine),
             other => Err(ParseScreenIdError(other.to_owned())),
         }
     }
@@ -94,6 +99,7 @@ pub enum ScreenEventType {
     RailEnd,
     // Outbound: emitted by the game engine to screens
     BossDefeated,
+    BossCleared,
     GameOver,
     ScoreUpdate,
     ScoreDelta,
@@ -147,6 +153,7 @@ impl ScreenEventType {
             Self::RailStart => "RailStart",
             Self::RailEnd => "RailEnd",
             Self::BossDefeated => "BossDefeated",
+            Self::BossCleared => "BossCleared",
             Self::GameOver => "GameOver",
             Self::ScoreUpdate => "ScoreUpdate",
             Self::ScoreDelta => "ScoreDelta",
@@ -207,6 +214,7 @@ impl From<String> for ScreenEventType {
             "RailStart" => Self::RailStart,
             "RailEnd" => Self::RailEnd,
             "BossDefeated" => Self::BossDefeated,
+            "BossCleared" => Self::BossCleared,
             "GameOver" => Self::GameOver,
             "ScoreUpdate" => Self::ScoreUpdate,
             "ScoreDelta" => Self::ScoreDelta,

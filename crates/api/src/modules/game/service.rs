@@ -1,6 +1,6 @@
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
-use game_logic::engine::config::RAIL_TICK_INTERVAL_MS;
+use game_logic::engine::config::{PVE_TICK_INTERVAL_MS, RAIL_TICK_INTERVAL_MS};
 use game_logic::{GameEngine, GameEvent};
 use shared::events::InboundMessage;
 use shared::screen::{ScreenEnvelope, ScreenEventType, ScreenId, ScreenTarget};
@@ -114,6 +114,8 @@ impl<'a> GameService<'a> {
         if result.game_over {
             // Cancel all active rail/ramp ticker tasks (dropping the senders is enough).
             self.state.active_rail_sessions.lock().await.clear();
+            // Cancel the PVE cooldown ticker.
+            self.state.pve_ticker_cancel.lock().await.take();
 
             match result.session_snapshot {
                 Some(session) => {
@@ -164,6 +166,11 @@ impl<'a> GameService<'a> {
         drop(session_guard);
         drop(engine_guard);
 
+        // Spawn PVE cooldown ticker for boss transition timing.
+        let (pve_cancel_tx, pve_cancel_rx) = tokio::sync::oneshot::channel();
+        *self.state.pve_ticker_cancel.lock().await = Some(pve_cancel_tx);
+        tokio::spawn(pve_ticker_task(self.state.clone(), pve_cancel_rx));
+
         let device_id = self.state.active_device_id.read().await.clone();
         if device_id.is_none() {
             warn!("no bridge connected — ESP32 sync skipped");
@@ -203,6 +210,9 @@ impl<'a> GameService<'a> {
         // Unlock before any await [§ 4.4]
         drop(session_guard);
         drop(engine_guard);
+
+        // Cancel the PVE cooldown ticker.
+        self.state.pve_ticker_cancel.lock().await.take();
 
         for env in envelopes {
             let _ = self.state.screen_router.dispatch(env).await;
@@ -295,6 +305,24 @@ impl<'a> GameService<'a> {
         self.dispatch_sync_and_save(result).await
     }
 
+    /// Process a single PVE tick to advance boss cooldown state transitions.
+    /// Called exclusively by the internal `pve_ticker_task`.
+    pub async fn process_pve_tick(&self, now: Instant) -> Result<(), GameServiceError> {
+        let mut engine_guard = self.state.game_engine.lock().await;
+        let mut session_guard = self.state.active_session.lock().await;
+
+        let Some(result) = Self::tick_engine(&mut engine_guard, &mut session_guard, |engine| {
+            engine.pve_tick(now)
+        }) else {
+            return Err(GameServiceError::NotInProgress);
+        };
+
+        drop(session_guard);
+        drop(engine_guard);
+
+        self.dispatch_sync_and_save(result).await
+    }
+
     /// Fetches the current top-10 leaderboard and dispatches it to `back_screen`.
     async fn broadcast_leaderboard(&self) {
         match score_service::get_leaderboard(&self.state.db_pool, 10).await {
@@ -307,7 +335,7 @@ impl<'a> GameService<'a> {
                     }
                 };
                 let envelope = ScreenEnvelope {
-                    from: ScreenId::BackScreen,
+                    from: ScreenId::GameEngine,
                     to: ScreenTarget::Screen {
                         id: ScreenId::BackScreen,
                     },
@@ -343,6 +371,30 @@ impl<'a> GameService<'a> {
         drop(engine_guard);
 
         self.dispatch_sync_and_save(result).await
+    }
+}
+
+/// Spawned once per game session. Ticks the PVE engine every `PVE_TICK_INTERVAL_MS` ms
+/// to advance boss cooldown transitions until the cancel signal fires.
+async fn pve_ticker_task(state: AppState, cancel: tokio::sync::oneshot::Receiver<()>) {
+    tokio::pin!(cancel);
+
+    loop {
+        tokio::select! {
+            biased;
+            _ = &mut cancel => break,
+            _ = tokio::time::sleep(Duration::from_millis(PVE_TICK_INTERVAL_MS)) => {
+                let now = Instant::now();
+                if GameService::new(&state)
+                    .process_pve_tick(now)
+                    .await
+                    .is_err()
+                {
+                    // Game ended while the task was running.
+                    break;
+                }
+            }
+        }
     }
 }
 

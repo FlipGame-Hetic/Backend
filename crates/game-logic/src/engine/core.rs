@@ -52,6 +52,19 @@ impl GameEngine {
         )
     }
 
+    /// Tick the PVE engine for cooldown/transition progression.
+    ///
+    /// Must be called periodically by the service layer while a game is in progress.
+    /// Returns envelopes produced by boss cooldown state transitions.
+    pub fn pve_tick(&mut self, now: Instant) -> Vec<ScreenEnvelope> {
+        let (envelopes, extra) = self.pve_engine.tick(now);
+        let mut all = envelopes;
+        for e in extra {
+            all.extend(self.process(e));
+        }
+        all
+    }
+
     pub fn take_snapshot(&self) -> crate::GameSnapshot {
         let now = Instant::now();
         let max_hp = self.pve_engine.boss_max_hp();
@@ -292,7 +305,7 @@ impl GameEngine {
                     .ultimate_charge
                     .saturating_add(pts / ULTIME_CHARGE_RATIO);
 
-                let (pve_env, extra) = self.pve_engine.on_event(&event, &mut self.state);
+                let (pve_env, extra) = self.pve_engine.on_score_delta(scored);
                 envelopes.extend(pve_env);
                 for e in extra {
                     envelopes.extend(self.process(e));
@@ -318,6 +331,11 @@ impl GameEngine {
                 let (_streak_changed, streak_armed) = self.streak.record(now);
                 let pts = crate::engine::scoring::score_portal_bonus();
                 self.state.add_score(pts);
+                let (pve_env, extra) = self.pve_engine.on_score_delta(pts);
+                envelopes.extend(pve_env);
+                for e in extra {
+                    envelopes.extend(self.process(e));
+                }
                 if streak_armed {
                     envelopes.push(self.emit_multiplier_update(now));
                 }
@@ -332,6 +350,11 @@ impl GameEngine {
                 let (_streak_changed, streak_armed) = self.streak.record(now);
                 let pts = crate::engine::config::BALL_SAVER_SCORE as u64;
                 self.state.add_score(pts);
+                let (pve_env, extra) = self.pve_engine.on_score_delta(pts);
+                envelopes.extend(pve_env);
+                for e in extra {
+                    envelopes.extend(self.process(e));
+                }
                 if streak_armed {
                     envelopes.push(self.emit_multiplier_update(now));
                 }
@@ -374,6 +397,11 @@ impl GameEngine {
                 let (_streak_changed, streak_armed) = self.streak.record(now);
                 let pts = crate::engine::config::MULTIBALL_SCORE as u64;
                 self.state.add_score(pts);
+                let (pve_env, extra) = self.pve_engine.on_score_delta(pts);
+                envelopes.extend(pve_env);
+                for e in extra {
+                    envelopes.extend(self.process(e));
+                }
                 if streak_armed {
                     envelopes.push(self.emit_multiplier_update(now));
                 }
@@ -403,6 +431,13 @@ impl GameEngine {
                 let current_multiplier = self.effective_multiplier(now);
                 let scaled_bonus = (effect.bonus_pts as f32 * current_multiplier) as u64;
                 self.state.add_score(scaled_bonus);
+                if scaled_bonus > 0 {
+                    let (pve_env, extra) = self.pve_engine.on_score_delta(scaled_bonus);
+                    envelopes.extend(pve_env);
+                    for e in extra {
+                        envelopes.extend(self.process(e));
+                    }
+                }
                 envelopes.push(self.emit_combo_activated(&effect));
                 if streak_armed {
                     envelopes.push(self.emit_multiplier_update(now));
@@ -440,6 +475,11 @@ impl GameEngine {
                 let current_multiplier = self.multiplier.current(now);
                 let scored = rail_tick_score(fib_step, current_multiplier);
                 self.state.add_score(scored);
+                let (pve_env, extra) = self.pve_engine.on_score_delta(scored);
+                envelopes.extend(pve_env);
+                for e in extra {
+                    envelopes.extend(self.process(e));
+                }
                 envelopes.push(self.emit_scored_delta(scored, "rail", ball_id));
                 envelopes.push(self.emit_score_update(bid));
             }
@@ -573,7 +613,7 @@ impl GameEngine {
 
 fn make_event_envelope(event_type: ScreenEventType, payload: serde_json::Value) -> ScreenEnvelope {
     ScreenEnvelope {
-        from: ScreenId::BackScreen,
+        from: ScreenId::GameEngine,
         to: ScreenTarget::Broadcast,
         event_type,
         payload,
