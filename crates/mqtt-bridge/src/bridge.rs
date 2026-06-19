@@ -221,7 +221,10 @@ where
         };
 
         match ws_msg {
-            WsMessage::Outbound { device_id, ref payload } => {
+            WsMessage::Outbound {
+                device_id,
+                ref payload,
+            } => {
                 info!(device_id = %device_id, payload = ?payload, "[WS ←] received outbound from API");
                 if let Err(e) = publish_outbound(&mqtt_client, &device_id, payload).await {
                     warn!(device_id, error = %e, "Failed to publish outbound to MQTT");
