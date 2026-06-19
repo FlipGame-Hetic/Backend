@@ -124,8 +124,14 @@ async fn read_loop(
             continue;
         }
 
+        info!(
+            screen = %screen_id,
+            event_type = ?envelope.event_type,
+            "[WS ←] received from screen"
+        );
+
         let result = state.screen_router.dispatch(envelope.clone()).await;
-        debug!(
+        info!(
             screen = %screen_id,
             delivered = result.delivered,
             missed = ?result.missed,
@@ -192,6 +198,8 @@ async fn write_loop(
                 continue;
             }
         };
+
+        info!(screen = %screen_id, len = json.len(), "[WS →] sending to screen");
 
         if let Err(e) = sink.send(Message::Text(json.into())).await {
             warn!(screen = %screen_id, error = %e, "failed to send to screen, closing");
