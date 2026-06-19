@@ -179,6 +179,9 @@ impl GameEngine {
             // UltimateActivated is no longer the activation path.
             // L2/R2 is the authoritative trigger. Ignore this event to avoid the old ping-pong.
             ScreenEventType::UltimateActivated => return vec![],
+            ScreenEventType::CapacityL2 | ScreenEventType::CapacityR2 => {
+                return self.process_ulti_press(Instant::now());
+            }
             ScreenEventType::Bumper => {
                 let ball_id = envelope
                     .payload
