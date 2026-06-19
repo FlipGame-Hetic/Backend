@@ -35,6 +35,8 @@ pub struct AppState {
     pub db_pool: sqlx::SqlitePool,
     /// Active rail/ramp ticker sessions. Dropping a sender cancels the associated task.
     pub active_rail_sessions: Arc<Mutex<HashMap<RailSessionKey, tokio::sync::oneshot::Sender<()>>>>,
+    /// Cancel signal for the PVE cooldown ticker task. Dropping cancels the task.
+    pub pve_ticker_cancel: Arc<Mutex<Option<tokio::sync::oneshot::Sender<()>>>>,
 }
 
 impl AppState {
@@ -52,6 +54,7 @@ impl AppState {
             active_device_id: Arc::new(tokio::sync::RwLock::new(None)),
             db_pool,
             active_rail_sessions: Arc::new(Mutex::new(HashMap::new())),
+            pve_ticker_cancel: Arc::new(Mutex::new(None)),
         }
     }
 }
