@@ -8,6 +8,9 @@ use shared::events::WsMessage;
 use tokio::sync::broadcast;
 use tracing::{debug, error, info, warn};
 
+use shared::model::ButtonId;
+use shared::screen::{ScreenEnvelope, ScreenEventType, ScreenId, ScreenTarget};
+
 use crate::modules::game::service::GameService;
 use crate::state::AppState;
 
@@ -106,35 +109,37 @@ async fn process_inbound(state: &AppState, payload: &shared::events::InboundMess
     if let shared::events::InboundMessage::Button(btn) = payload {
         let game_running = state.game_engine.lock().await.is_some();
 
-        if !game_running && btn.state > 0 {
-            let result = state.menu_state.lock().await.handle_button(&btn.id);
-
-            match result {
-                crate::modules::menu::state_machine::MenuResult::Envelopes(envelopes) => {
-                    for env in envelopes {
-                        let _ = state.screen_router.dispatch(env).await;
-                    }
-                    return;
-                }
-                crate::modules::menu::state_machine::MenuResult::StartGame {
-                    character_id,
-                    envelopes,
-                } => {
-                    for env in envelopes {
-                        let _ = state.screen_router.dispatch(env).await;
-                    }
-                    if let Err(e) = GameService::new(state).start(character_id).await {
-                        error!(error = %e, "failed to start game from menu");
-                    }
-                    return;
-                }
-                crate::modules::menu::state_machine::MenuResult::Ignored => return,
+        if !game_running {
+            if btn.state > 0
+                && let Some(menu_id) = map_button_to_menu_id(&btn.id)
+            {
+                let env = ScreenEnvelope {
+                    from: ScreenId::FrontScreen,
+                    to: ScreenTarget::Screen {
+                        id: ScreenId::BackScreen,
+                    },
+                    event_type: ScreenEventType::MenuButton,
+                    payload: serde_json::json!({ "id": menu_id, "state": btn.state }),
+                };
+                let _ = state.screen_router.dispatch(env).await;
             }
+            return;
         }
     }
 
     if let Err(e) = GameService::new(state).process_inbound(payload).await {
         error!(error = %e, "game service error processing inbound");
+    }
+}
+
+fn map_button_to_menu_id(id: &ButtonId) -> Option<&'static str> {
+    match id {
+        ButtonId::L1 => Some("flipper_left"),
+        ButtonId::R1 => Some("flipper_right"),
+        ButtonId::L2 => Some("extra_1"),
+        ButtonId::R2 => Some("extra_2"),
+        ButtonId::Start => Some("start"),
+        _ => None,
     }
 }
 
