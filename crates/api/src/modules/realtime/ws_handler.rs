@@ -86,7 +86,7 @@ async fn read_loop(mut stream: futures_util::stream::SplitStream<WebSocket>, sta
                 ref device_id,
                 ref payload,
             } => {
-                debug!(device_id = %device_id, payload = ?payload, "received inbound from bridge");
+                info!(device_id = %device_id, payload = ?payload, "[WS ←] received inbound from bridge");
 
                 {
                     let mut id_guard = state.active_device_id.write().await;
@@ -162,6 +162,8 @@ async fn write_loop(
                 continue;
             }
         };
+
+        info!(len = json.len(), payload = %json, "[WS →] sending outbound to bridge");
 
         if let Err(e) = sink.send(Message::Text(json.into())).await {
             warn!(error = %e, "failed to send to bridge ws, closing write loop");
