@@ -98,7 +98,7 @@ pub const RAIL_MAX_FIB_STEP: u32 = 7;
 // Boss transition timing
 /// Delay after BossDefeated before BossCleared is emitted (death animation window).
 pub const BOSS_DEATH_ANIM_MS: u64 = 3_000;
-/// Cooldown between BossCleared and the next BossUpdate (score-only phase).
-pub const BOSS_COOLDOWN_MS: u64 = 10_000;
+/// Points the player must score before the first boss appears (and between each boss).
+pub const BOSS_SCORE_THRESHOLD: u64 = 15_000;
 /// Interval at which the service layer ticks the PVE engine for cooldown transitions.
 pub const PVE_TICK_INTERVAL_MS: u64 = 250;
