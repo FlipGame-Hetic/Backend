@@ -22,9 +22,9 @@ pub const TILT_PENALTY_1: i64 = -2_000;
 pub const TILT_PENALTY_2: i64 = -6_000;
 
 // Boss HP
-pub const BOSS_0_HP: u32 = 128_000;
-pub const BOSS_1_HP: u32 = 512_000;
-pub const BOSS_2_HP: u32 = 1_024_000;
+pub const BOSS_0_HP: u32 = 64_000;
+pub const BOSS_1_HP: u32 = 128_000;
+pub const BOSS_2_HP: u32 = 512_000;
 
 // Boss difficulty scaling
 pub const BOSS_0_DIFFICULTY_SCALE: f32 = 1.0;
