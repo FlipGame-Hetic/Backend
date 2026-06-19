@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize, JsonSchema)]
 pub struct StartGameRequest {
-    pub character_id: u8,
+    pub character: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, JsonSchema)]
@@ -13,6 +13,7 @@ pub struct GameStateResponse {
     pub lives: u8,
     pub active_multiplier: f32,
     pub ultimate_charge: u32,
+    pub ultimate_max: u32,
     pub shield_active: bool,
     pub boss_hp_percent: Option<f32>,
 }
@@ -30,6 +31,7 @@ impl From<game_logic::GameSnapshot> for GameStateResponse {
             lives: snap.state.lives,
             active_multiplier: snap.current_multiplier,
             ultimate_charge: snap.state.ultimate_charge,
+            ultimate_max: 0, // filled by the service layer which knows the character
             shield_active: snap.state.shield_active,
             boss_hp_percent: snap.boss_hp_percent,
         }

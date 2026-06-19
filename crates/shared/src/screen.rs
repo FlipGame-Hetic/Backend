@@ -130,6 +130,8 @@ pub enum ScreenEventType {
     PlungerCharge,
     LeaderboardUpdate,
     MenuButton,
+    UltimateTriggered,
+    UltimateStopped,
     /// Extension / test events that are not part of the known protocol.
     Unknown(String),
 }
@@ -184,6 +186,8 @@ impl ScreenEventType {
             Self::PlungerCharge => "PlungerCharge",
             Self::LeaderboardUpdate => "LeaderboardUpdate",
             Self::MenuButton => "MenuButton",
+            Self::UltimateTriggered => "UltimateTriggered",
+            Self::UltimateStopped => "UltimateStopped",
             Self::Unknown(s) => s.as_str(),
         }
     }
@@ -245,6 +249,8 @@ impl From<String> for ScreenEventType {
             "PlungerCharge" => Self::PlungerCharge,
             "LeaderboardUpdate" => Self::LeaderboardUpdate,
             "MenuButton" => Self::MenuButton,
+            "UltimateTriggered" => Self::UltimateTriggered,
+            "UltimateStopped" => Self::UltimateStopped,
             _ => Self::Unknown(s),
         }
     }

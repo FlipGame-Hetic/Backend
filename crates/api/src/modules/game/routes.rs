@@ -16,6 +16,7 @@ pub fn router() -> Router<AppState> {
         .route("/api/v1/game/start", post(start_game))
         .route("/api/v1/game/state", get(game_state))
         .route("/api/v1/game/end", post(end_game))
+        .route("/api/v1/characters", get(get_characters))
 }
 
 #[lucy_http(
@@ -24,13 +25,13 @@ pub fn router() -> Router<AppState> {
     tags        = "game",
     request     = StartGameRequest,
     response    = GameStateResponse,
-    description = "Start a new game session with the chosen character",
+    description = "Start a new game session with the chosen character (slug: enforcer | viper | ghost | oracle)",
 )]
 pub async fn start_game(
     State(state): State<AppState>,
     axum::Json(body): axum::Json<StartGameRequest>,
 ) -> Result<impl IntoResponse, ApiError> {
-    let snapshot = GameService::new(&state).start(body.character_id).await?;
+    let snapshot = GameService::new(&state).start(body.character).await?;
 
     Ok((
         StatusCode::OK,
@@ -46,7 +47,6 @@ pub async fn start_game(
     description = "Returns the current game engine state, or 404 if no game is running",
 )]
 pub async fn game_state(State(state): State<AppState>) -> Result<impl IntoResponse, ApiError> {
-    // Lock order: engine FIRST [§ 4.4]
     let engine_guard = state.game_engine.lock().await;
 
     let Some(engine) = engine_guard.as_ref() else {
@@ -79,6 +79,72 @@ pub async fn end_game(State(state): State<AppState>) -> Result<impl IntoResponse
     ))
 }
 
+/// Returns the gameplay roster (no visual data — the front merges by slug with its own config).
+pub async fn get_characters() -> impl IntoResponse {
+    let characters = serde_json::json!([
+        {
+            "id": "enforcer",
+            "ulti_id": "multiball_split",
+            "shape": "instant",
+            "cancellable": false,
+            "charge_max": 320,
+            "charge_profile": {
+                "weight_bumper": 1.0,
+                "weight_rail": 0.3,
+                "weight_combo": 1.0,
+                "weight_other": 1.0,
+                "time_rate": 0.0
+            }
+        },
+        {
+            "id": "viper",
+            "ulti_id": "rampage",
+            "shape": "sustained",
+            "cancellable": false,
+            "duration_ms": 8000,
+            "charge_max": 360,
+            "payload": { "multiplier": 5.0 },
+            "charge_profile": {
+                "weight_bumper": 1.0,
+                "weight_rail": 1.0,
+                "weight_combo": 1.0,
+                "weight_other": 1.0,
+                "time_rate": 0.0
+            }
+        },
+        {
+            "id": "ghost",
+            "ulti_id": "mimic",
+            "shape": "inherited",
+            "charge_max": 300,
+            "charge_profile": {
+                "weight_bumper": 1.0,
+                "weight_rail": 1.0,
+                "weight_combo": 1.0,
+                "weight_other": 1.0,
+                "time_rate": 0.0
+            }
+        },
+        {
+            "id": "oracle",
+            "ulti_id": "time_slow",
+            "shape": "sustained",
+            "cancellable": true,
+            "duration_ms": 5000,
+            "charge_max": 240,
+            "payload": { "slow_factor": 0.25 },
+            "charge_profile": {
+                "weight_bumper": 1.0,
+                "weight_rail": 1.0,
+                "weight_combo": 1.0,
+                "weight_other": 1.0,
+                "time_rate": 1.0
+            }
+        }
+    ]);
+    (StatusCode::OK, axum::Json(characters))
+}
+
 #[cfg(test)]
 mod tests {
     use axum::body::Body;
@@ -93,10 +159,8 @@ mod tests {
         AppState::new(b"flipper-dev-secret-change-in-prod".to_vec(), pool)
     }
 
-    fn start_body(character_id: u8) -> Body {
-        Body::from(
-            serde_json::to_vec(&serde_json::json!({ "character_id": character_id })).unwrap(),
-        )
+    fn start_body(character: &str) -> Body {
+        Body::from(serde_json::to_vec(&serde_json::json!({ "character": character })).unwrap())
     }
 
     async fn post(app: axum::Router, path: &str, body: Body) -> (StatusCode, serde_json::Value) {
@@ -135,7 +199,7 @@ mod tests {
         let state = test_state().await;
         let app = router().with_state(state);
 
-        let (status, body) = post(app, "/api/v1/game/start", start_body(1)).await;
+        let (status, body) = post(app, "/api/v1/game/start", start_body("enforcer")).await;
 
         assert_eq!(status, StatusCode::OK);
         assert_eq!(body["phase"], "in_game");
@@ -146,10 +210,10 @@ mod tests {
         let state = test_state().await;
         let app = router().with_state(state);
 
-        let (s1, _) = post(app.clone(), "/api/v1/game/start", start_body(1)).await;
+        let (s1, _) = post(app.clone(), "/api/v1/game/start", start_body("viper")).await;
         assert_eq!(s1, StatusCode::OK);
 
-        let (s2, body) = post(app, "/api/v1/game/start", start_body(1)).await;
+        let (s2, body) = post(app, "/api/v1/game/start", start_body("viper")).await;
         assert_eq!(s2, StatusCode::CONFLICT);
         assert_eq!(body["error"], "conflict");
     }
@@ -169,7 +233,7 @@ mod tests {
         let state = test_state().await;
         let app = router().with_state(state);
 
-        let (s, _) = post(app.clone(), "/api/v1/game/start", start_body(2)).await;
+        let (s, _) = post(app.clone(), "/api/v1/game/start", start_body("ghost")).await;
         assert_eq!(s, StatusCode::OK);
 
         let (status, body) = get(app, "/api/v1/game/state").await;
@@ -192,15 +256,25 @@ mod tests {
         let state = test_state().await;
         let app = router().with_state(state);
 
-        let (s, _) = post(app.clone(), "/api/v1/game/start", start_body(1)).await;
+        let (s, _) = post(app.clone(), "/api/v1/game/start", start_body("oracle")).await;
         assert_eq!(s, StatusCode::OK);
 
         let (s_end, body_end) = post(app.clone(), "/api/v1/game/end", Body::empty()).await;
         assert_eq!(s_end, StatusCode::OK);
         assert_eq!(body_end["phase"], "game_over");
 
-        // Engine is cleared — next GET /state must return 404
         let (s_state, _) = get(app, "/api/v1/game/state").await;
         assert_eq!(s_state, StatusCode::NOT_FOUND);
+    }
+
+    #[tokio::test]
+    async fn get_characters_returns_4_entries() {
+        let state = test_state().await;
+        let app = router().with_state(state);
+
+        let (status, body) = get(app, "/api/v1/characters").await;
+        assert_eq!(status, StatusCode::OK);
+        let arr = body.as_array().expect("should be a JSON array");
+        assert_eq!(arr.len(), 4);
     }
 }

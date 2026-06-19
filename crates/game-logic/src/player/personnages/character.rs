@@ -1,39 +1,65 @@
 use crate::engine::config::{
-    CYBORG_BONUS_COOLDOWN_MS, CYBORG_MALUS_COOLDOWN_MS, CYBORG_ULTIMATE_MAX,
-    DREDD_BONUS_COOLDOWN_MS, DREDD_MALUS_COOLDOWN_MS, DREDD_ULTIMATE_MAX, HACKER_BONUS_COOLDOWN_MS,
-    HACKER_MALUS_COOLDOWN_MS, HACKER_ULTIMATE_MAX, ROBOCP_BONUS_COOLDOWN_MS,
-    ROBOCP_MALUS_COOLDOWN_MS, ROBOCP_ULTIMATE_MAX,
+    DEFAULT_BONUS_COOLDOWN_MS, DEFAULT_MALUS_COOLDOWN_MS, ENFORCER_CHARGE_MAX,
+    ENFORCER_WEIGHT_BUMPER, ENFORCER_WEIGHT_COMBO, ENFORCER_WEIGHT_OTHER, ENFORCER_WEIGHT_RAIL,
+    GHOST_CHARGE_MAX, ORACLE_CHARGE_MAX, ORACLE_TIME_RATE, ORACLE_ULTI_DURATION_MS,
+    VIPER_CHARGE_MAX, VIPER_ULTI_DURATION_MS,
 };
-use crate::player::personnages::character_stats::CharacterStats;
+use crate::player::personnages::character_stats::{CharacterChargeProfile, CharacterStats};
 use crate::player::skills::{BonusSkill, MalusSkill};
 
+#[derive(Debug, Clone)]
+pub enum UltiShape {
+    Instant,
+    Sustained {
+        duration_ms: u64,
+        cancellable: bool,
+    },
+    /// Ghost inherits from the cycle; resolved at activation time.
+    Inherited,
+}
+
 pub trait Character: Send + Sync {
-    fn id(&self) -> u8;
+    fn slug(&self) -> &'static str;
     fn name(&self) -> &'static str;
     fn stats(&self) -> &CharacterStats;
+    fn ulti_id(&self) -> &'static str;
+    fn ulti_shape(&self) -> UltiShape;
     fn bonus(&self) -> BonusSkill;
     fn malus(&self) -> MalusSkill;
 }
 
-pub struct RoboCop;
-pub struct JudgeDredd;
-pub struct Hacker;
-pub struct Cyborg;
+pub struct Enforcer;
+pub struct Viper;
+pub struct Ghost;
+pub struct Oracle;
 
-impl Character for RoboCop {
-    fn id(&self) -> u8 {
-        0
+impl Character for Enforcer {
+    fn slug(&self) -> &'static str {
+        "enforcer"
     }
     fn name(&self) -> &'static str {
-        "RoboCop"
+        "KEENU"
     }
     fn stats(&self) -> &CharacterStats {
         static STATS: CharacterStats = CharacterStats {
-            ultimate_charge_max: ROBOCP_ULTIMATE_MAX,
-            bonus_cooldown_ms: ROBOCP_BONUS_COOLDOWN_MS,
-            malus_cooldown_ms: ROBOCP_MALUS_COOLDOWN_MS,
+            charge_profile: CharacterChargeProfile {
+                charge_max: ENFORCER_CHARGE_MAX,
+                weight_bumper: ENFORCER_WEIGHT_BUMPER,
+                weight_rail: ENFORCER_WEIGHT_RAIL,
+                weight_combo: ENFORCER_WEIGHT_COMBO,
+                weight_other: ENFORCER_WEIGHT_OTHER,
+                time_rate: 0.0,
+            },
+            bonus_cooldown_ms: DEFAULT_BONUS_COOLDOWN_MS,
+            malus_cooldown_ms: DEFAULT_MALUS_COOLDOWN_MS,
         };
         &STATS
+    }
+    fn ulti_id(&self) -> &'static str {
+        "multiball_split"
+    }
+    fn ulti_shape(&self) -> UltiShape {
+        UltiShape::Instant
     }
     fn bonus(&self) -> BonusSkill {
         BonusSkill::Shield
@@ -43,20 +69,36 @@ impl Character for RoboCop {
     }
 }
 
-impl Character for JudgeDredd {
-    fn id(&self) -> u8 {
-        1
+impl Character for Viper {
+    fn slug(&self) -> &'static str {
+        "viper"
     }
     fn name(&self) -> &'static str {
-        "Judge Dredd"
+        "VIPER"
     }
     fn stats(&self) -> &CharacterStats {
         static STATS: CharacterStats = CharacterStats {
-            ultimate_charge_max: DREDD_ULTIMATE_MAX,
-            bonus_cooldown_ms: DREDD_BONUS_COOLDOWN_MS,
-            malus_cooldown_ms: DREDD_MALUS_COOLDOWN_MS,
+            charge_profile: CharacterChargeProfile {
+                charge_max: VIPER_CHARGE_MAX,
+                weight_bumper: 1.0,
+                weight_rail: 1.0,
+                weight_combo: 1.0,
+                weight_other: 1.0,
+                time_rate: 0.0,
+            },
+            bonus_cooldown_ms: DEFAULT_BONUS_COOLDOWN_MS,
+            malus_cooldown_ms: DEFAULT_MALUS_COOLDOWN_MS,
         };
         &STATS
+    }
+    fn ulti_id(&self) -> &'static str {
+        "rampage"
+    }
+    fn ulti_shape(&self) -> UltiShape {
+        UltiShape::Sustained {
+            duration_ms: VIPER_ULTI_DURATION_MS,
+            cancellable: false,
+        }
     }
     fn bonus(&self) -> BonusSkill {
         BonusSkill::DamageBoost
@@ -66,20 +108,33 @@ impl Character for JudgeDredd {
     }
 }
 
-impl Character for Hacker {
-    fn id(&self) -> u8 {
-        2
+impl Character for Ghost {
+    fn slug(&self) -> &'static str {
+        "ghost"
     }
     fn name(&self) -> &'static str {
-        "Hacker"
+        "GHOST"
     }
     fn stats(&self) -> &CharacterStats {
         static STATS: CharacterStats = CharacterStats {
-            ultimate_charge_max: HACKER_ULTIMATE_MAX,
-            bonus_cooldown_ms: HACKER_BONUS_COOLDOWN_MS,
-            malus_cooldown_ms: HACKER_MALUS_COOLDOWN_MS,
+            charge_profile: CharacterChargeProfile {
+                charge_max: GHOST_CHARGE_MAX,
+                weight_bumper: 1.0,
+                weight_rail: 1.0,
+                weight_combo: 1.0,
+                weight_other: 1.0,
+                time_rate: 0.0,
+            },
+            bonus_cooldown_ms: DEFAULT_BONUS_COOLDOWN_MS,
+            malus_cooldown_ms: DEFAULT_MALUS_COOLDOWN_MS,
         };
         &STATS
+    }
+    fn ulti_id(&self) -> &'static str {
+        "mimic"
+    }
+    fn ulti_shape(&self) -> UltiShape {
+        UltiShape::Inherited
     }
     fn bonus(&self) -> BonusSkill {
         BonusSkill::ComboMultiplier
@@ -89,42 +144,69 @@ impl Character for Hacker {
     }
 }
 
-impl Character for Cyborg {
-    fn id(&self) -> u8 {
-        3
+impl Character for Oracle {
+    fn slug(&self) -> &'static str {
+        "oracle"
     }
     fn name(&self) -> &'static str {
-        "Cyborg"
+        "ORACLE"
     }
     fn stats(&self) -> &CharacterStats {
         static STATS: CharacterStats = CharacterStats {
-            ultimate_charge_max: CYBORG_ULTIMATE_MAX,
-            bonus_cooldown_ms: CYBORG_BONUS_COOLDOWN_MS,
-            malus_cooldown_ms: CYBORG_MALUS_COOLDOWN_MS,
+            charge_profile: CharacterChargeProfile {
+                charge_max: ORACLE_CHARGE_MAX,
+                weight_bumper: 1.0,
+                weight_rail: 1.0,
+                weight_combo: 1.0,
+                weight_other: 1.0,
+                time_rate: ORACLE_TIME_RATE,
+            },
+            bonus_cooldown_ms: DEFAULT_BONUS_COOLDOWN_MS,
+            malus_cooldown_ms: DEFAULT_MALUS_COOLDOWN_MS,
         };
         &STATS
     }
+    fn ulti_id(&self) -> &'static str {
+        "time_slow"
+    }
+    fn ulti_shape(&self) -> UltiShape {
+        UltiShape::Sustained {
+            duration_ms: ORACLE_ULTI_DURATION_MS,
+            cancellable: true,
+        }
+    }
     fn bonus(&self) -> BonusSkill {
-        BonusSkill::ExtraFlippers
+        BonusSkill::TimeSlowdown
     }
     fn malus(&self) -> MalusSkill {
         MalusSkill::ModifyBounce
     }
 }
 
-pub fn select_character(id: u8) -> Box<dyn Character> {
-    match id {
-        0 => Box::new(RoboCop),
-        1 => Box::new(JudgeDredd),
-        2 => Box::new(Hacker),
-        3 => Box::new(Cyborg),
+pub fn select_character(slug: &str) -> Box<dyn Character> {
+    match slug {
+        "enforcer" => Box::new(Enforcer),
+        "viper" => Box::new(Viper),
+        "ghost" => Box::new(Ghost),
+        "oracle" => Box::new(Oracle),
         unknown => {
             tracing::warn!(
-                character_id = unknown,
-                "unknown character id, defaulting to RoboCop"
+                character = unknown,
+                "unknown character slug, defaulting to enforcer"
             );
-            Box::new(RoboCop)
+            Box::new(Enforcer)
         }
+    }
+}
+
+/// Maps a character slug to a stable integer for DB persistence.
+pub fn slug_to_db_id(slug: &str) -> u8 {
+    match slug {
+        "enforcer" => 0,
+        "viper" => 1,
+        "ghost" => 2,
+        "oracle" => 3,
+        _ => 0,
     }
 }
 
@@ -133,28 +215,35 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_select_character_robocp() {
-        let c = select_character(0);
-        assert_eq!(c.id(), 0);
-        assert_eq!(c.name(), "RoboCop");
+    fn test_select_character_enforcer() {
+        let c = select_character("enforcer");
+        assert_eq!(c.slug(), "enforcer");
+        assert_eq!(c.name(), "KEENU");
     }
 
     #[test]
-    fn test_select_invalid_id_defaults() {
-        let c = select_character(99);
-        assert_eq!(c.id(), 0);
+    fn test_select_invalid_slug_defaults() {
+        let c = select_character("unknown_hero");
+        assert_eq!(c.slug(), "enforcer");
     }
 
     #[test]
-    fn test_all_characters_have_unique_ids() {
-        let ids: Vec<u8> = vec![
-            select_character(0).id(),
-            select_character(1).id(),
-            select_character(2).id(),
-            select_character(3).id(),
-        ];
+    fn test_all_characters_have_unique_slugs() {
+        let slugs = ["enforcer", "viper", "ghost", "oracle"];
+        let mut seen: Vec<&str> = slugs.iter().map(|s| select_character(s).slug()).collect();
+        seen.sort_unstable();
+        seen.dedup();
+        assert_eq!(seen.len(), slugs.len());
+    }
+
+    #[test]
+    fn test_slug_to_db_id_unique() {
+        let ids: Vec<u8> = ["enforcer", "viper", "ghost", "oracle"]
+            .iter()
+            .map(|s| slug_to_db_id(s))
+            .collect();
         let mut sorted = ids.clone();
-        sorted.sort();
+        sorted.sort_unstable();
         sorted.dedup();
         assert_eq!(sorted.len(), ids.len());
     }
