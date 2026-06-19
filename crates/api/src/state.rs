@@ -6,7 +6,6 @@ use screen_hub::registry::ScreenRegistry;
 use screen_hub::router::ScreenRouter;
 use tokio::sync::Mutex;
 
-use crate::modules::menu::state_machine::MenuStateMachine;
 use crate::modules::realtime::hub::BridgeHub;
 
 /// Identifies a single rail scoring session, unique per ball.
@@ -36,7 +35,6 @@ pub struct AppState {
     pub db_pool: sqlx::SqlitePool,
     /// Active rail/ramp ticker sessions. Dropping a sender cancels the associated task.
     pub active_rail_sessions: Arc<Mutex<HashMap<RailSessionKey, tokio::sync::oneshot::Sender<()>>>>,
-    pub menu_state: Arc<Mutex<MenuStateMachine>>,
 }
 
 impl AppState {
@@ -54,7 +52,6 @@ impl AppState {
             active_device_id: Arc::new(tokio::sync::RwLock::new(None)),
             db_pool,
             active_rail_sessions: Arc::new(Mutex::new(HashMap::new())),
-            menu_state: Arc::new(Mutex::new(MenuStateMachine::new())),
         }
     }
 }
