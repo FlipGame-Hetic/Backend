@@ -12,6 +12,13 @@ jobs:
     permissions:
       contents: read
       packages: write
+    strategy:
+      matrix:
+        include:
+          - crate: api
+            image: ghcr.io/flipgame-hetic/backend
+          - crate: mqtt-bridge
+            image: ghcr.io/flipgame-hetic/mqtt-bridge
 
     steps:
       - name: Checkout
@@ -31,7 +38,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/flipgame-hetic/backend
+          images: ${{ matrix.image }}
           tags: |
             type=ref,event=branch
             type=semver,pattern={{version}}
@@ -43,7 +50,8 @@ jobs:
         with:
           context: .
           push: true
+          build-args: CRATE=${{ matrix.crate }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=registry,ref=ghcr.io/flipgame-hetic/backend:buildcache
-          cache-to: type=registry,ref=ghcr.io/flipgame-hetic/backend:buildcache,mode=max
+          cache-from: type=registry,ref=${{ matrix.image }}:buildcache
+          cache-to: type=registry,ref=${{ matrix.image }}:buildcache,mode=max
