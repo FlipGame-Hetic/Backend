@@ -1,11 +1,9 @@
 use crate::engine::config::{
-    DEFAULT_BONUS_COOLDOWN_MS, DEFAULT_MALUS_COOLDOWN_MS, ENFORCER_CHARGE_MAX,
-    ENFORCER_WEIGHT_BUMPER, ENFORCER_WEIGHT_COMBO, ENFORCER_WEIGHT_OTHER, ENFORCER_WEIGHT_RAIL,
-    GHOST_CHARGE_MAX, ORACLE_CHARGE_MAX, ORACLE_TIME_RATE, ORACLE_ULTI_DURATION_MS,
-    VIPER_CHARGE_MAX, VIPER_ULTI_DURATION_MS,
+    ENFORCER_CHARGE_MAX, ENFORCER_WEIGHT_BUMPER, ENFORCER_WEIGHT_COMBO, ENFORCER_WEIGHT_OTHER,
+    ENFORCER_WEIGHT_RAIL, GHOST_CHARGE_MAX, ORACLE_CHARGE_MAX, ORACLE_TIME_RATE,
+    ORACLE_ULTI_DURATION_MS, VIPER_CHARGE_MAX, VIPER_ULTI_DURATION_MS,
 };
 use crate::player::personnages::character_stats::{CharacterChargeProfile, CharacterStats};
-use crate::player::skills::{BonusSkill, MalusSkill};
 
 #[derive(Debug, Clone)]
 pub enum UltiShape {
@@ -24,8 +22,6 @@ pub trait Character: Send + Sync {
     fn stats(&self) -> &CharacterStats;
     fn ulti_id(&self) -> &'static str;
     fn ulti_shape(&self) -> UltiShape;
-    fn bonus(&self) -> BonusSkill;
-    fn malus(&self) -> MalusSkill;
 }
 
 pub struct Enforcer;
@@ -50,8 +46,6 @@ impl Character for Enforcer {
                 weight_other: ENFORCER_WEIGHT_OTHER,
                 time_rate: 0.0,
             },
-            bonus_cooldown_ms: DEFAULT_BONUS_COOLDOWN_MS,
-            malus_cooldown_ms: DEFAULT_MALUS_COOLDOWN_MS,
         };
         &STATS
     }
@@ -60,12 +54,6 @@ impl Character for Enforcer {
     }
     fn ulti_shape(&self) -> UltiShape {
         UltiShape::Instant
-    }
-    fn bonus(&self) -> BonusSkill {
-        BonusSkill::Shield
-    }
-    fn malus(&self) -> MalusSkill {
-        MalusSkill::InkBlot
     }
 }
 
@@ -86,8 +74,6 @@ impl Character for Viper {
                 weight_other: 1.0,
                 time_rate: 0.0,
             },
-            bonus_cooldown_ms: DEFAULT_BONUS_COOLDOWN_MS,
-            malus_cooldown_ms: DEFAULT_MALUS_COOLDOWN_MS,
         };
         &STATS
     }
@@ -99,12 +85,6 @@ impl Character for Viper {
             duration_ms: VIPER_ULTI_DURATION_MS,
             cancellable: false,
         }
-    }
-    fn bonus(&self) -> BonusSkill {
-        BonusSkill::DamageBoost
-    }
-    fn malus(&self) -> MalusSkill {
-        MalusSkill::BumperReduction
     }
 }
 
@@ -125,8 +105,6 @@ impl Character for Ghost {
                 weight_other: 1.0,
                 time_rate: 0.0,
             },
-            bonus_cooldown_ms: DEFAULT_BONUS_COOLDOWN_MS,
-            malus_cooldown_ms: DEFAULT_MALUS_COOLDOWN_MS,
         };
         &STATS
     }
@@ -135,12 +113,6 @@ impl Character for Ghost {
     }
     fn ulti_shape(&self) -> UltiShape {
         UltiShape::Inherited
-    }
-    fn bonus(&self) -> BonusSkill {
-        BonusSkill::ComboMultiplier
-    }
-    fn malus(&self) -> MalusSkill {
-        MalusSkill::Invisible
     }
 }
 
@@ -161,8 +133,6 @@ impl Character for Oracle {
                 weight_other: 1.0,
                 time_rate: ORACLE_TIME_RATE,
             },
-            bonus_cooldown_ms: DEFAULT_BONUS_COOLDOWN_MS,
-            malus_cooldown_ms: DEFAULT_MALUS_COOLDOWN_MS,
         };
         &STATS
     }
@@ -174,12 +144,6 @@ impl Character for Oracle {
             duration_ms: ORACLE_ULTI_DURATION_MS,
             cancellable: true,
         }
-    }
-    fn bonus(&self) -> BonusSkill {
-        BonusSkill::TimeSlowdown
-    }
-    fn malus(&self) -> MalusSkill {
-        MalusSkill::ModifyBounce
     }
 }
 

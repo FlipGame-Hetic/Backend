@@ -10,6 +10,4 @@ pub struct CharacterChargeProfile {
 
 pub struct CharacterStats {
     pub charge_profile: CharacterChargeProfile,
-    pub bonus_cooldown_ms: u64,
-    pub malus_cooldown_ms: u64,
 }

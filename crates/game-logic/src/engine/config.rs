@@ -58,10 +58,6 @@ pub const COMBO_14_BONUS: u32 = 2_000;
 pub const COMBO_15_BONUS: u32 = 2_000;
 pub const COMBO_16_BONUS: u32 = 2_000;
 
-// Shared cooldown defaults (bonus/malus skills)
-pub const DEFAULT_BONUS_COOLDOWN_MS: u64 = 30_000;
-pub const DEFAULT_MALUS_COOLDOWN_MS: u64 = 45_000;
-
 // Enforcer (KEENU) — multiball_split (instant)
 pub const ENFORCER_CHARGE_MAX: u32 = 320;
 pub const ENFORCER_WEIGHT_BUMPER: f32 = 1.0;
@@ -106,17 +102,3 @@ pub const BOSS_DEATH_ANIM_MS: u64 = 3_000;
 pub const BOSS_COOLDOWN_MS: u64 = 10_000;
 /// Interval at which the service layer ticks the PVE engine for cooldown transitions.
 pub const PVE_TICK_INTERVAL_MS: u64 = 250;
-
-// Skill effects
-pub const SKILL_SHIELD_DURATION_MS: u64 = 8_000;
-
-pub const SKILL_DAMAGE_BOOST_MULTIPLIER: f32 = 2.0;
-pub const SKILL_DAMAGE_BOOST_DURATION_MS: u64 = 5_000;
-
-pub const SKILL_COMBO_MULTIPLIER_FACTOR: f32 = 3.0;
-pub const SKILL_COMBO_MULTIPLIER_DURATION_MS: u64 = 8_000;
-
-pub const SKILL_EXTRA_FLIPPERS_DURATION_MS: u64 = 6_000;
-pub const SKILL_TIME_SLOWDOWN_DURATION_MS: u64 = 5_000;
-pub const SKILL_FREEZE_DURATION_MS: u64 = 3_000;
-pub const SKILL_PORTAL_BONUS_PTS: u32 = 1_000;
