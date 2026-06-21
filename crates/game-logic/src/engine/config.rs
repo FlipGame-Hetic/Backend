@@ -59,22 +59,22 @@ pub const COMBO_15_BONUS: u32 = 2_000;
 pub const COMBO_16_BONUS: u32 = 2_000;
 
 // Enforcer (KEENU) — multiball_split (instant)
-pub const ENFORCER_CHARGE_MAX: u32 = 256;
+pub const ENFORCER_CHARGE_MAX: u32 = 80;
 pub const ENFORCER_WEIGHT_BUMPER: f32 = 1.0;
 pub const ENFORCER_WEIGHT_RAIL: f32 = 0.3; // rampes sous-pondérées
 pub const ENFORCER_WEIGHT_COMBO: f32 = 1.0;
 pub const ENFORCER_WEIGHT_OTHER: f32 = 1.0;
 
 // Viper (VIPER) — rampage (sustained 8s, non-cancellable)
-pub const VIPER_CHARGE_MAX: u32 = 288;
+pub const VIPER_CHARGE_MAX: u32 = 80;
 pub const VIPER_ULTI_DURATION_MS: u64 = 8_000;
 pub const VIPER_RAMPAGE_MULTIPLIER: f32 = 5.0;
 
 // Ghost (GHOST) — mimic (inherited)
-pub const GHOST_CHARGE_MAX: u32 = 240;
+pub const GHOST_CHARGE_MAX: u32 = 60;
 
 // Oracle (ORACLE) — time_slow (sustained 5s, cancellable)
-pub const ORACLE_CHARGE_MAX: u32 = 192;
+pub const ORACLE_CHARGE_MAX: u32 = 80;
 pub const ORACLE_ULTI_DURATION_MS: u64 = 5_000;
 pub const ORACLE_SLOW_FACTOR: f32 = 0.25;
 pub const ORACLE_TIME_RATE: f32 = 1.0; // ~1 charge unit/second
@@ -98,7 +98,7 @@ pub const RAIL_MAX_FIB_STEP: u32 = 7;
 // Boss transition timing
 /// Delay after BossDefeated before BossCleared is emitted (death animation window).
 pub const BOSS_DEATH_ANIM_MS: u64 = 3_000;
-/// Cooldown between BossCleared and the next BossUpdate (score-only phase).
-pub const BOSS_COOLDOWN_MS: u64 = 10_000;
+/// Points the player must score before the first boss appears (and between each boss).
+pub const BOSS_SCORE_THRESHOLD: u64 = 15_000;
 /// Interval at which the service layer ticks the PVE engine for cooldown transitions.
 pub const PVE_TICK_INTERVAL_MS: u64 = 250;
