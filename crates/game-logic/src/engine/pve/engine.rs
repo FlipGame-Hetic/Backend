@@ -76,8 +76,7 @@ impl PveEngine {
 
         match self.state.phase {
             PvePhase::WaitingForScore => {
-                self.state.score_accumulated =
-                    self.state.score_accumulated.saturating_add(delta);
+                self.state.score_accumulated = self.state.score_accumulated.saturating_add(delta);
                 if self.state.score_accumulated >= BOSS_SCORE_THRESHOLD {
                     self.state.score_accumulated = 0;
                     let next = self.state.next_boss_index;
@@ -252,7 +251,7 @@ fn make_event_envelope(event_type: ScreenEventType, payload: serde_json::Value) 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::engine::config::{DEFAULT_LIVES, BOSS_SCORE_THRESHOLD};
+    use crate::engine::config::{BOSS_SCORE_THRESHOLD, DEFAULT_LIVES};
     use crate::engine::states::GameState;
     use std::time::Duration;
 
