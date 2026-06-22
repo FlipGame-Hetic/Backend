@@ -3,12 +3,12 @@ use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use axum::routing::get;
 use lucyd::lucy_http;
+use schemars::JsonSchema;
 use serde::Serialize;
-use utoipa::ToSchema;
 
 use crate::state::AppState;
 
-#[derive(Serialize, ToSchema)]
+#[derive(Serialize, JsonSchema)]
 pub struct HealthResponse {
     status: &'static str,
 }
@@ -18,10 +18,11 @@ pub fn router() -> Router<AppState> {
 }
 
 #[lucy_http(
-    method = "GET",
-    path = "/health",
-    tags = "system",
-    description = "Returns 200 OK when the service is up"
+    method      = "GET",
+    path        = "/health",
+    tags        = "system",
+    response    = HealthResponse,
+    description = "Returns 200 OK when the service is up",
 )]
 pub async fn health_check() -> impl IntoResponse {
     (StatusCode::OK, axum::Json(HealthResponse { status: "ok" }))

@@ -1,23 +1,24 @@
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::model::{ButtonId, CommandKind, EventKind, GamePhase, HitType};
 
 // ESP32 => Server
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct ButtonInput {
     pub id: ButtonId,
     pub state: u8,
     pub ts: u64,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct PlungerInput {
     pub state: u8,
     pub ts: u64,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct GyroInput {
     pub ax: f32,
     pub ay: f32,
@@ -25,7 +26,7 @@ pub struct GyroInput {
     pub tilt: bool,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct Telemetry {
     pub wifi_rssi: i32,
     pub uptime_s: u64,
@@ -34,7 +35,7 @@ pub struct Telemetry {
     pub mqtt_reconnects: u32,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct DeviceEvent {
     pub event: EventKind,
     pub fw_version: String,
@@ -42,7 +43,7 @@ pub struct DeviceEvent {
     pub ts: u64,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct DeviceStatus {
     pub online: bool,
     pub fw_version: String,
@@ -65,7 +66,7 @@ pub struct BumperHit {
 
 // Server => ESP32
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct Hit {
     pub id: String,
     #[serde(rename = "type")]
@@ -73,12 +74,12 @@ pub struct Hit {
     pub force: f32,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct BallHit {
     pub hits: Vec<Hit>,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct GameState {
     pub state: GamePhase,
     pub ball_number: u32,
@@ -87,7 +88,7 @@ pub struct GameState {
     pub total_players: u32,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct Command {
     pub cmd: CommandKind,
     pub params: serde_json::Value,
@@ -95,7 +96,7 @@ pub struct Command {
 
 // Unified envelope for all inbound messages
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(tag = "_type")]
 pub enum InboundMessage {
     Button(ButtonInput),
@@ -108,7 +109,7 @@ pub enum InboundMessage {
 
 // Unified envelope for all outbound messages
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(tag = "_type")]
 pub enum OutboundMessage {
     BallHit(BallHit),
@@ -357,7 +358,7 @@ mod tests {
 // and the central API is wrapped in this envelope so the API knows
 // which device it comes from / should be routed to.
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(tag = "dir", rename_all = "snake_case")]
 pub enum WsMessage {
     /// Bridge => API: an inbound event from a device.

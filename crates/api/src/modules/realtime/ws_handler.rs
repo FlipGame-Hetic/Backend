@@ -16,9 +16,11 @@ use crate::state::AppState;
 
 /// Axum handler: upgrade HTTP to WebSocket for a bridge connection.
 #[lucy_ws(
-    path = "/ws/bridge",
-    tags = "realtime",
-    description = "MQTT bridge WebSocket, bidirectional relay between the backend and the mqtt-bridge process"
+    path        = "/ws/bridge",
+    tags        = "realtime",
+    request     = WsMessage,
+    response    = WsMessage,
+    description = "MQTT bridge WebSocket, bidirectional relay between the backend and the mqtt-bridge process",
 )]
 pub async fn ws_bridge(ws: WebSocketUpgrade, State(state): State<AppState>) -> impl IntoResponse {
     info!("bridge websocket upgrade requested");

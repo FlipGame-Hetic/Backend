@@ -22,6 +22,7 @@ pub struct TokenQuery {
     path        = "/ws/screen/{screen_id}",
     tags        = "screens, realtime",
     request     = ScreenEnvelope,
+    response    = ScreenEnvelope,
     description = "Per-screen WebSocket, authenticated by JWT, relays ScreenEnvelope frames",
 )]
 pub async fn ws_screen(

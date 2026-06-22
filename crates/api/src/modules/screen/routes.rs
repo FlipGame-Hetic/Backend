@@ -8,17 +8,16 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use shared::screen::{ScreenEnvelope, ScreenId};
 use tracing::{debug, warn};
-use utoipa::ToSchema;
 
 use crate::state::AppState;
 
-#[derive(Debug, Serialize, Deserialize, ToSchema, JsonSchema)]
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
 pub struct ConnectedScreensResponse {
     pub screens: Vec<ScreenId>,
     pub count: usize,
 }
 
-#[derive(Debug, Serialize, Deserialize, ToSchema, JsonSchema)]
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
 pub struct SendResponse {
     pub delivered: usize,
     pub missed: Vec<ScreenId>,
@@ -31,14 +30,6 @@ pub fn router() -> Router<AppState> {
         .route("/api/v1/screens/send", post(send_to_screen))
 }
 
-#[utoipa::path(
-    get,
-    path = "/api/v1/screens/connected",
-    tag = "screens",
-    responses(
-        (status = 200, description = "Connected screens", body = ConnectedScreensResponse),
-    )
-)]
 #[lucy_http(
     method      = "GET",
     path        = "/api/v1/screens/connected",
@@ -57,25 +48,6 @@ pub async fn connected_screens(State(state): State<AppState>) -> impl IntoRespon
 }
 
 /// Debug endpoint — inject a `ScreenEnvelope` without a real WS connection.
-#[utoipa::path(
-    post,
-    path = "/api/v1/screens/send",
-    tag = "screens",
-    request_body(
-        content = ScreenEnvelope,
-        content_type = "application/json",
-        example = json!({
-            "from": "front_screen",
-            "to": { "kind": "screen", "id": "back_screen" },
-            "event_type": "game_state_update",
-            "payload": { "score": 42000, "combo": 3 }
-        })
-    ),
-    responses(
-        (status = 200, description = "Dispatched", body = SendResponse),
-        (status = 422, description = "Invalid envelope"),
-    )
-)]
 #[lucy_http(
     method      = "POST",
     path        = "/api/v1/screens/send",
