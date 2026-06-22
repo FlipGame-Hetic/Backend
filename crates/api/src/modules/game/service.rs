@@ -1,6 +1,8 @@
 use std::time::{Duration, Instant};
 
-use game_logic::engine::config::{PVE_TICK_INTERVAL_MS, RAIL_TICK_INTERVAL_MS};
+use game_logic::engine::config::{
+    PVE_TICK_INTERVAL_MS, RAIL_MAX_SESSION_MS, RAIL_TICK_INTERVAL_MS,
+};
 use game_logic::{GameEngine, GameEvent};
 use shared::events::InboundMessage;
 use shared::screen::{ScreenEnvelope, ScreenEventType, ScreenId, ScreenTarget};
@@ -151,6 +153,8 @@ impl<'a> GameService<'a> {
         if session_guard.is_some() {
             return Err(GameServiceError::AlreadyInProgress);
         }
+
+        self.state.active_rail_sessions.lock().await.clear();
 
         let mut engine = GameEngine::new(&character);
         let envelopes = engine.process(game_logic::GameEvent::StartGame);
@@ -407,12 +411,16 @@ async fn rail_ticker_task(
 ) {
     tokio::pin!(cancel);
     let mut fib_step: u32 = 0;
+    let start = std::time::Instant::now();
 
     loop {
         tokio::select! {
             biased;
             _ = &mut cancel => break,
             _ = tokio::time::sleep(Duration::from_millis(RAIL_TICK_INTERVAL_MS)) => {
+                if start.elapsed() >= Duration::from_millis(RAIL_MAX_SESSION_MS) {
+                    break;
+                }
                 if GameService::new(&state)
                     .process_rail_tick(ball_id.clone(), fib_step)
                     .await

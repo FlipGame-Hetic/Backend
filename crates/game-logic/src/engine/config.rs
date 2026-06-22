@@ -90,6 +90,7 @@ pub const STREAK_TIER_3_MULTIPLIER: f32 = 3.0;
 
 // Rail
 pub const RAIL_TICK_INTERVAL_MS: u64 = 100;
+pub const RAIL_MAX_SESSION_MS: u64 = 10_000;
 pub const RAIL_BASE_SCORE: u32 = 4;
 /// Fibonacci step is capped so the score per tick doesn't blow up.
 /// fib(10) = 89 → 890 pts/tick at ×1 multiplier, which is a sane ceiling.
