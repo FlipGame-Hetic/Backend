@@ -103,7 +103,6 @@ cargo llvm-cov --html
 | **rumqttc** 0.25                   | Async MQTT client                         |
 | **tokio-tungstenite** 0.26         | WebSocket client (bridge)                 |
 | **lucyd** ≥ 0.1.9                  | Interactive OpenAPI docs UI (`/docs`)     |
-| **utoipa** 5.4                     | OpenAPI spec generation (Axum integration)|
 | **sqlx** 0.8                       | Async SQLite driver with migrations       |
 | **jsonwebtoken** 9                 | JWT encoding / validation                 |
 | **tower-http** 0.6                 | CORS + request tracing middleware         |

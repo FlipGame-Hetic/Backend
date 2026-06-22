@@ -3,10 +3,8 @@ use std::str::FromStr;
 
 use schemars::JsonSchema;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use utoipa::ToSchema;
-
 /// Fixed set of known frontend screens.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema, JsonSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ScreenId {
     FrontScreen,
@@ -65,7 +63,7 @@ impl FromStr for ScreenId {
 }
 
 /// Routing target for a screen message.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema, JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case", tag = "kind")]
 pub enum ScreenTarget {
     /// Send to a single specific screen.
@@ -284,11 +282,10 @@ impl schemars::JsonSchema for ScreenEventType {
 }
 
 /// Envelope for messages transiting between frontend screens via the backend.
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema, JsonSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct ScreenEnvelope {
     pub from: ScreenId,
     pub to: ScreenTarget,
-    #[schema(value_type = String)]
     pub event_type: ScreenEventType,
     pub payload: serde_json::Value,
 }
