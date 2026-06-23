@@ -62,7 +62,7 @@ async fn get_json(app: &axum::Router, path: &str) -> (StatusCode, Value) {
     (status, json)
 }
 
-// Test 1: POST /game/start → GET /game/state returns in_game
+// Test 1: POST /game/start → GET /game/state returns in_game with character slug
 #[tokio::test]
 async fn start_game_then_state_is_in_game() {
     let app = build_app(test_pool().await);
@@ -76,10 +76,12 @@ async fn start_game_then_state_is_in_game() {
 
     assert_eq!(status, StatusCode::OK);
     assert_eq!(body["phase"], "in_game");
+    assert_eq!(body["character"], "enforcer");
 
     let (status, body) = get_json(&app, "/api/v1/game/state").await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(body["phase"], "in_game");
+    assert_eq!(body["character"], "enforcer");
 }
 
 // Test 2: POST /game/start twice → 409 Conflict

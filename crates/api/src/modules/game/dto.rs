@@ -16,6 +16,9 @@ pub struct GameStateResponse {
     pub ultimate_max: u32,
     pub shield_active: bool,
     pub boss_hp_percent: Option<f32>,
+    /// Active character slug; absent when no game is in progress.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub character: Option<String>,
 }
 
 impl From<game_logic::GameSnapshot> for GameStateResponse {
@@ -34,6 +37,7 @@ impl From<game_logic::GameSnapshot> for GameStateResponse {
             ultimate_max: 0, // filled by the service layer which knows the character
             shield_active: snap.state.shield_active,
             boss_hp_percent: snap.boss_hp_percent,
+            character: None, // populated by the route handler from active_session
         }
     }
 }
