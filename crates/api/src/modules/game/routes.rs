@@ -31,12 +31,12 @@ pub async fn start_game(
     State(state): State<AppState>,
     axum::Json(body): axum::Json<StartGameRequest>,
 ) -> Result<impl IntoResponse, ApiError> {
+    let character = body.character.clone();
     let snapshot = GameService::new(&state).start(body.character).await?;
+    let mut response = GameStateResponse::from(snapshot);
+    response.character = Some(character);
 
-    Ok((
-        StatusCode::OK,
-        axum::Json(GameStateResponse::from(snapshot)),
-    ))
+    Ok((StatusCode::OK, axum::Json(response)))
 }
 
 #[lucy_http(
@@ -57,10 +57,17 @@ pub async fn game_state(State(state): State<AppState>) -> Result<impl IntoRespon
     let snapshot = engine.take_snapshot();
     drop(engine_guard);
 
-    Ok((
-        StatusCode::OK,
-        axum::Json(GameStateResponse::from(snapshot)),
-    ))
+    let character = state
+        .active_session
+        .lock()
+        .await
+        .as_ref()
+        .map(|s| s.character_slug.clone());
+
+    let mut response = GameStateResponse::from(snapshot);
+    response.character = character;
+
+    Ok((StatusCode::OK, axum::Json(response)))
 }
 
 #[lucy_http(
@@ -239,6 +246,7 @@ mod tests {
         let (status, body) = get(app, "/api/v1/game/state").await;
         assert_eq!(status, StatusCode::OK);
         assert_eq!(body["phase"], "in_game");
+        assert_eq!(body["character"], "ghost");
     }
 
     #[tokio::test]
