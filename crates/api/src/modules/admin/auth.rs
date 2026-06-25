@@ -39,7 +39,7 @@ impl FromRequestParts<AppState> for AdminUser {
     }
 }
 
-fn extract_bearer<'a>(parts: &'a Parts) -> Result<&'a str, ApiError> {
+fn extract_bearer(parts: &Parts) -> Result<&str, ApiError> {
     parts
         .headers
         .get("authorization")
@@ -64,7 +64,6 @@ fn verify_admin_token(token: &str, secret: &[u8]) -> Result<AdminClaims, ApiErro
     Ok(data.claims)
 }
 
-#[cfg(test)]
 pub fn generate_admin_token(secret: &[u8]) -> String {
     let claims = AdminClaims {
         sub: "admin".to_owned(),

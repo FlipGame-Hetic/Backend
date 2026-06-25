@@ -58,6 +58,27 @@ cargo doc --open
 | `API_PORT`         | no       | `8080`                       | HTTP listen port                                   |
 | `ALLOWED_ORIGINS`  | no       | `http://localhost:3000`      | Comma-separated CORS allowed origins               |
 
+## Admin token
+
+Admin routes (`/api/v1/admin/…`) require a `Authorization: Bearer <token>` header where the token is a JWT signed with `SCREEN_JWT_SECRET` and carrying `role: "admin"`.
+
+Generate a token with the built-in CLI command:
+
+```bash
+# Local
+SCREEN_JWT_SECRET='your-secret' cargo run -p api -- generate-admin-token
+
+# Docker (secret is already injected via the container env)
+docker compose run --rm api generate-admin-token
+
+# Or inside a running container
+docker exec <container_name> /app/api generate-admin-token
+```
+
+Output: `ADMIN_TOKEN=eyJ…` — copy the value and use it as the Bearer token.
+
+> The token has no expiry. Keep it secret; rotate by regenerating with a new `SCREEN_JWT_SECRET`.
+
 ## REST API
 
 | Method | Path                | Description                                                  |

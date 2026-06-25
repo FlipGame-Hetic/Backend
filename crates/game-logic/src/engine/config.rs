@@ -3,6 +3,75 @@ use std::sync::{LazyLock, RwLock, RwLockReadGuard};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
+#[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema)]
+pub struct GameConfigPatch {
+    pub default_lives: Option<u8>,
+    pub ultime_charge_ratio: Option<u32>,
+    pub ball_saver_score: Option<u32>,
+    pub bumper_score: Option<u32>,
+    pub bumper_triangle_score: Option<u32>,
+    pub portal_score: Option<u32>,
+    pub multiball_ring_threshold: Option<u32>,
+    pub multiball_score: Option<u32>,
+    pub timer_bonus_seconds: Option<u64>,
+    pub timer_bonus_score: Option<u32>,
+    pub timer_bonus_multiplier: Option<f32>,
+    pub tilt_penalty_1: Option<i64>,
+    pub tilt_penalty_2: Option<i64>,
+    pub boss_0_hp: Option<u32>,
+    pub boss_1_hp: Option<u32>,
+    pub boss_2_hp: Option<u32>,
+    pub boss_0_difficulty_scale: Option<f32>,
+    pub boss_1_difficulty_scale: Option<f32>,
+    pub boss_2_difficulty_scale: Option<f32>,
+    pub endless_base_difficulty_scale: Option<f32>,
+    pub endless_level_scale_exponent: Option<f32>,
+    pub combo_buffer_max: Option<usize>,
+    pub combo_detection_window_ms: Option<u64>,
+    pub combo_penalty_repeat: Option<usize>,
+    pub combo_penalty_pts: Option<i64>,
+    pub combo_2_bonus: Option<u32>,
+    pub combo_3_bonus: Option<u32>,
+    pub combo_4_bonus: Option<u32>,
+    pub combo_5_bonus: Option<u32>,
+    pub combo_6_bonus: Option<u32>,
+    pub combo_7_bonus: Option<u32>,
+    pub combo_8_bonus: Option<u32>,
+    pub combo_9_bonus: Option<u32>,
+    pub combo_10_bonus: Option<u32>,
+    pub combo_11_bonus: Option<u32>,
+    pub combo_14_bonus: Option<u32>,
+    pub combo_15_bonus: Option<u32>,
+    pub combo_16_bonus: Option<u32>,
+    pub enforcer_charge_max: Option<u32>,
+    pub enforcer_weight_bumper: Option<f32>,
+    pub enforcer_weight_rail: Option<f32>,
+    pub enforcer_weight_combo: Option<f32>,
+    pub enforcer_weight_other: Option<f32>,
+    pub viper_charge_max: Option<u32>,
+    pub viper_ulti_duration_ms: Option<u64>,
+    pub viper_rampage_multiplier: Option<f32>,
+    pub ghost_charge_max: Option<u32>,
+    pub oracle_charge_max: Option<u32>,
+    pub oracle_ulti_duration_ms: Option<u64>,
+    pub oracle_slow_factor: Option<f32>,
+    pub oracle_time_rate: Option<f32>,
+    pub streak_window_ms: Option<u64>,
+    pub streak_tier_1_count: Option<u32>,
+    pub streak_tier_2_count: Option<u32>,
+    pub streak_tier_3_count: Option<u32>,
+    pub streak_tier_1_multiplier: Option<f32>,
+    pub streak_tier_2_multiplier: Option<f32>,
+    pub streak_tier_3_multiplier: Option<f32>,
+    pub rail_tick_interval_ms: Option<u64>,
+    pub rail_max_session_ms: Option<u64>,
+    pub rail_base_score: Option<u32>,
+    pub rail_max_fib_step: Option<u32>,
+    pub boss_death_anim_ms: Option<u64>,
+    pub boss_score_threshold: Option<u64>,
+    pub pve_tick_interval_ms: Option<u64>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct GameConfig {
     // Core game settings
@@ -187,4 +256,80 @@ pub fn get() -> RwLockReadGuard<'static, GameConfig> {
 
 pub fn set(cfg: GameConfig) {
     *CONFIG.write().expect("game config lock poisoned") = cfg;
+}
+
+pub fn apply_patch(patch: GameConfigPatch) {
+    let mut cfg = CONFIG.write().expect("game config lock poisoned");
+    macro_rules! apply {
+        ($field:ident) => {
+            if let Some(v) = patch.$field {
+                cfg.$field = v;
+            }
+        };
+    }
+    apply!(default_lives);
+    apply!(ultime_charge_ratio);
+    apply!(ball_saver_score);
+    apply!(bumper_score);
+    apply!(bumper_triangle_score);
+    apply!(portal_score);
+    apply!(multiball_ring_threshold);
+    apply!(multiball_score);
+    apply!(timer_bonus_seconds);
+    apply!(timer_bonus_score);
+    apply!(timer_bonus_multiplier);
+    apply!(tilt_penalty_1);
+    apply!(tilt_penalty_2);
+    apply!(boss_0_hp);
+    apply!(boss_1_hp);
+    apply!(boss_2_hp);
+    apply!(boss_0_difficulty_scale);
+    apply!(boss_1_difficulty_scale);
+    apply!(boss_2_difficulty_scale);
+    apply!(endless_base_difficulty_scale);
+    apply!(endless_level_scale_exponent);
+    apply!(combo_buffer_max);
+    apply!(combo_detection_window_ms);
+    apply!(combo_penalty_repeat);
+    apply!(combo_penalty_pts);
+    apply!(combo_2_bonus);
+    apply!(combo_3_bonus);
+    apply!(combo_4_bonus);
+    apply!(combo_5_bonus);
+    apply!(combo_6_bonus);
+    apply!(combo_7_bonus);
+    apply!(combo_8_bonus);
+    apply!(combo_9_bonus);
+    apply!(combo_10_bonus);
+    apply!(combo_11_bonus);
+    apply!(combo_14_bonus);
+    apply!(combo_15_bonus);
+    apply!(combo_16_bonus);
+    apply!(enforcer_charge_max);
+    apply!(enforcer_weight_bumper);
+    apply!(enforcer_weight_rail);
+    apply!(enforcer_weight_combo);
+    apply!(enforcer_weight_other);
+    apply!(viper_charge_max);
+    apply!(viper_ulti_duration_ms);
+    apply!(viper_rampage_multiplier);
+    apply!(ghost_charge_max);
+    apply!(oracle_charge_max);
+    apply!(oracle_ulti_duration_ms);
+    apply!(oracle_slow_factor);
+    apply!(oracle_time_rate);
+    apply!(streak_window_ms);
+    apply!(streak_tier_1_count);
+    apply!(streak_tier_2_count);
+    apply!(streak_tier_3_count);
+    apply!(streak_tier_1_multiplier);
+    apply!(streak_tier_2_multiplier);
+    apply!(streak_tier_3_multiplier);
+    apply!(rail_tick_interval_ms);
+    apply!(rail_max_session_ms);
+    apply!(rail_base_score);
+    apply!(rail_max_fib_step);
+    apply!(boss_death_anim_ms);
+    apply!(boss_score_threshold);
+    apply!(pve_tick_interval_ms);
 }
