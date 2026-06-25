@@ -1,4 +1,4 @@
-use crate::engine::config::{BOSS_0_HP, BOSS_1_HP, BOSS_2_HP};
+use crate::engine::config;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BossKind {
@@ -17,10 +17,11 @@ impl BossKind {
     }
 
     pub fn base_hp(&self) -> u32 {
+        let cfg = config::get();
         match self {
-            Self::GLaDOS => BOSS_0_HP,
-            Self::HAL9000 => BOSS_1_HP,
-            Self::AUTO => BOSS_2_HP,
+            Self::GLaDOS => cfg.boss_0_hp,
+            Self::HAL9000 => cfg.boss_1_hp,
+            Self::AUTO => cfg.boss_2_hp,
         }
     }
 

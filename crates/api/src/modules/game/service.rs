@@ -1,8 +1,6 @@
 use std::time::{Duration, Instant};
 
-use game_logic::engine::config::{
-    PVE_TICK_INTERVAL_MS, RAIL_MAX_SESSION_MS, RAIL_TICK_INTERVAL_MS,
-};
+use game_logic::engine::config;
 use game_logic::{GameEngine, GameEvent};
 use shared::events::InboundMessage;
 use shared::screen::{ScreenEnvelope, ScreenEventType, ScreenId, ScreenTarget};
@@ -387,7 +385,7 @@ async fn pve_ticker_task(state: AppState, cancel: tokio::sync::oneshot::Receiver
         tokio::select! {
             biased;
             _ = &mut cancel => break,
-            _ = tokio::time::sleep(Duration::from_millis(PVE_TICK_INTERVAL_MS)) => {
+            _ = tokio::time::sleep(Duration::from_millis(config::get().pve_tick_interval_ms)) => {
                 let now = Instant::now();
                 if GameService::new(&state)
                     .process_pve_tick(now)
@@ -417,8 +415,8 @@ async fn rail_ticker_task(
         tokio::select! {
             biased;
             _ = &mut cancel => break,
-            _ = tokio::time::sleep(Duration::from_millis(RAIL_TICK_INTERVAL_MS)) => {
-                if start.elapsed() >= Duration::from_millis(RAIL_MAX_SESSION_MS) {
+            _ = tokio::time::sleep(Duration::from_millis(config::get().rail_tick_interval_ms)) => {
+                if start.elapsed() >= Duration::from_millis(config::get().rail_max_session_ms) {
                     break;
                 }
                 if GameService::new(&state)

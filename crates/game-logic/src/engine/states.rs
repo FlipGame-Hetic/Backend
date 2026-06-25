@@ -1,6 +1,6 @@
 use std::time::Instant;
 
-use crate::engine::config::{TILT_PENALTY_1, TILT_PENALTY_2};
+use crate::engine::config;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum GamePhase {
@@ -23,9 +23,10 @@ pub struct TiltState {
 impl TiltState {
     pub fn on_tilt(&mut self) -> TiltEffect {
         self.count += 1;
+        let cfg = config::get();
         match self.count {
-            1 => TiltEffect::Penalty(TILT_PENALTY_1),
-            2 => TiltEffect::Penalty(TILT_PENALTY_2),
+            1 => TiltEffect::Penalty(cfg.tilt_penalty_1),
+            2 => TiltEffect::Penalty(cfg.tilt_penalty_2),
             _ => TiltEffect::CheatingDetected,
         }
     }

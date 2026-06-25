@@ -1,105 +1,190 @@
-//Core game settings
-pub const DEFAULT_LIVES: u8 = 3;
-pub const ULTIME_CHARGE_RATIO: u32 = 100;
-pub const BALL_SAVER_SCORE: u32 = 300;
+use std::sync::{LazyLock, RwLock, RwLockReadGuard};
 
-// Bumper scoring
-pub const BUMPER_SCORE: u32 = 100;
-pub const BUMPER_TRIANGLE_SCORE: u32 = 150;
-pub const PORTAL_SCORE: u32 = 200;
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
 
-// Multiball
-pub const MULTIBALL_RING_THRESHOLD: u32 = 10;
-pub const MULTIBALL_SCORE: u32 = 600;
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct GameConfig {
+    // Core game settings
+    pub default_lives: u8,
+    pub ultime_charge_ratio: u32,
+    pub ball_saver_score: u32,
 
-// Timer bonus (BonusGameTimerMultiplier)
-pub const TIMER_BONUS_SECONDS: u64 = 60;
-pub const TIMER_BONUS_SCORE: u32 = 500;
-pub const TIMER_BONUS_MULTIPLIER: f32 = 1.5;
+    // Bumper scoring
+    pub bumper_score: u32,
+    pub bumper_triangle_score: u32,
+    pub portal_score: u32,
 
-// Tilt penalties
-pub const TILT_PENALTY_1: i64 = -2_000;
-pub const TILT_PENALTY_2: i64 = -6_000;
+    // Multiball
+    pub multiball_ring_threshold: u32,
+    pub multiball_score: u32,
 
-// Boss HP
-pub const BOSS_0_HP: u32 = 64_000;
-pub const BOSS_1_HP: u32 = 128_000;
-pub const BOSS_2_HP: u32 = 512_000;
+    // Timer bonus
+    pub timer_bonus_seconds: u64,
+    pub timer_bonus_score: u32,
+    pub timer_bonus_multiplier: f32,
 
-// Boss difficulty scaling
-pub const BOSS_0_DIFFICULTY_SCALE: f32 = 1.0;
-pub const BOSS_1_DIFFICULTY_SCALE: f32 = 1.6;
-pub const BOSS_2_DIFFICULTY_SCALE: f32 = 2.4;
-pub const ENDLESS_BASE_DIFFICULTY_SCALE: f32 = 2.4;
-pub const ENDLESS_LEVEL_SCALE_EXPONENT: f32 = 1.3;
+    // Tilt penalties
+    pub tilt_penalty_1: i64,
+    pub tilt_penalty_2: i64,
 
-// Combo system
-pub const COMBO_BUFFER_MAX: usize = 10;
-pub const COMBO_DETECTION_WINDOW_MS: u64 = 2_000;
-pub const COMBO_PENALTY_REPEAT: usize = 7;
-pub const COMBO_PENALTY_PTS: i64 = 2_000;
+    // Boss HP
+    pub boss_0_hp: u32,
+    pub boss_1_hp: u32,
+    pub boss_2_hp: u32,
 
-// Combo stats: bonus_pts only (combos grant points, not a score multiplier)
-pub const COMBO_2_BONUS: u32 = 0;
-pub const COMBO_3_BONUS: u32 = 0;
-pub const COMBO_4_BONUS: u32 = 1_000;
-pub const COMBO_5_BONUS: u32 = 2_000;
-pub const COMBO_6_BONUS: u32 = 2_000;
-pub const COMBO_7_BONUS: u32 = 2_000;
-pub const COMBO_8_BONUS: u32 = 2_000;
+    // Boss difficulty scaling
+    pub boss_0_difficulty_scale: f32,
+    pub boss_1_difficulty_scale: f32,
+    pub boss_2_difficulty_scale: f32,
+    pub endless_base_difficulty_scale: f32,
+    pub endless_level_scale_exponent: f32,
 
-// Hard 6-button combos
-pub const COMBO_9_BONUS: u32 = 1_500;
-pub const COMBO_10_BONUS: u32 = 1_500;
-pub const COMBO_11_BONUS: u32 = 1_550;
+    // Combo system
+    pub combo_buffer_max: usize,
+    pub combo_detection_window_ms: u64,
+    pub combo_penalty_repeat: usize,
+    pub combo_penalty_pts: i64,
 
-// Very hard 7-button combos
-pub const COMBO_14_BONUS: u32 = 2_000;
-pub const COMBO_15_BONUS: u32 = 2_000;
-pub const COMBO_16_BONUS: u32 = 2_000;
+    // Combo bonuses
+    pub combo_2_bonus: u32,
+    pub combo_3_bonus: u32,
+    pub combo_4_bonus: u32,
+    pub combo_5_bonus: u32,
+    pub combo_6_bonus: u32,
+    pub combo_7_bonus: u32,
+    pub combo_8_bonus: u32,
+    pub combo_9_bonus: u32,
+    pub combo_10_bonus: u32,
+    pub combo_11_bonus: u32,
+    pub combo_14_bonus: u32,
+    pub combo_15_bonus: u32,
+    pub combo_16_bonus: u32,
 
-// Enforcer (KEENU) — multiball_split (instant)
-pub const ENFORCER_CHARGE_MAX: u32 = 80;
-pub const ENFORCER_WEIGHT_BUMPER: f32 = 1.0;
-pub const ENFORCER_WEIGHT_RAIL: f32 = 0.3; // rampes sous-pondérées
-pub const ENFORCER_WEIGHT_COMBO: f32 = 1.0;
-pub const ENFORCER_WEIGHT_OTHER: f32 = 1.0;
+    // Enforcer (KEENU) — multiball_split
+    pub enforcer_charge_max: u32,
+    pub enforcer_weight_bumper: f32,
+    pub enforcer_weight_rail: f32,
+    pub enforcer_weight_combo: f32,
+    pub enforcer_weight_other: f32,
 
-// Viper (VIPER) — rampage (sustained 8s, non-cancellable)
-pub const VIPER_CHARGE_MAX: u32 = 80;
-pub const VIPER_ULTI_DURATION_MS: u64 = 8_000;
-pub const VIPER_RAMPAGE_MULTIPLIER: f32 = 5.0;
+    // Viper (VIPER) — rampage
+    pub viper_charge_max: u32,
+    pub viper_ulti_duration_ms: u64,
+    pub viper_rampage_multiplier: f32,
 
-// Ghost (GHOST) — mimic (inherited)
-pub const GHOST_CHARGE_MAX: u32 = 60;
+    // Ghost (GHOST) — mimic
+    pub ghost_charge_max: u32,
 
-// Oracle (ORACLE) — time_slow (sustained 5s, cancellable)
-pub const ORACLE_CHARGE_MAX: u32 = 80;
-pub const ORACLE_ULTI_DURATION_MS: u64 = 5_000;
-pub const ORACLE_SLOW_FACTOR: f32 = 0.25;
-pub const ORACLE_TIME_RATE: f32 = 1.0; // ~1 charge unit/second
+    // Oracle (ORACLE) — time_slow
+    pub oracle_charge_max: u32,
+    pub oracle_ulti_duration_ms: u64,
+    pub oracle_slow_factor: f32,
+    pub oracle_time_rate: f32,
 
-// Streak multiplier (triggers on rapid successive scoring events)
-pub const STREAK_WINDOW_MS: u64 = 2_000;
-pub const STREAK_TIER_1_COUNT: u32 = 2;
-pub const STREAK_TIER_2_COUNT: u32 = 5;
-pub const STREAK_TIER_3_COUNT: u32 = 10;
-pub const STREAK_TIER_1_MULTIPLIER: f32 = 1.5;
-pub const STREAK_TIER_2_MULTIPLIER: f32 = 2.0;
-pub const STREAK_TIER_3_MULTIPLIER: f32 = 3.0;
+    // Streak multiplier
+    pub streak_window_ms: u64,
+    pub streak_tier_1_count: u32,
+    pub streak_tier_2_count: u32,
+    pub streak_tier_3_count: u32,
+    pub streak_tier_1_multiplier: f32,
+    pub streak_tier_2_multiplier: f32,
+    pub streak_tier_3_multiplier: f32,
 
-// Rail
-pub const RAIL_TICK_INTERVAL_MS: u64 = 100;
-pub const RAIL_MAX_SESSION_MS: u64 = 10_000;
-pub const RAIL_BASE_SCORE: u32 = 4;
-/// Fibonacci step is capped so the score per tick doesn't blow up.
-/// fib(10) = 89 → 890 pts/tick at ×1 multiplier, which is a sane ceiling.
-pub const RAIL_MAX_FIB_STEP: u32 = 7;
+    // Rail
+    pub rail_tick_interval_ms: u64,
+    pub rail_max_session_ms: u64,
+    pub rail_base_score: u32,
+    /// Fibonacci step cap so score per tick stays sane. fib(7) = 21.
+    pub rail_max_fib_step: u32,
 
-// Boss transition timing
-/// Delay after BossDefeated before BossCleared is emitted (death animation window).
-pub const BOSS_DEATH_ANIM_MS: u64 = 3_000;
-/// Points the player must score before the first boss appears (and between each boss).
-pub const BOSS_SCORE_THRESHOLD: u64 = 15_000;
-/// Interval at which the service layer ticks the PVE engine for cooldown transitions.
-pub const PVE_TICK_INTERVAL_MS: u64 = 250;
+    // Boss transition timing
+    /// Delay after BossDefeated before BossCleared is emitted.
+    pub boss_death_anim_ms: u64,
+    /// Points the player must score before the first boss appears (and between each boss).
+    pub boss_score_threshold: u64,
+    /// Interval at which the service layer ticks the PVE engine.
+    pub pve_tick_interval_ms: u64,
+}
+
+impl Default for GameConfig {
+    fn default() -> Self {
+        Self {
+            default_lives: 3,
+            ultime_charge_ratio: 100,
+            ball_saver_score: 300,
+            bumper_score: 100,
+            bumper_triangle_score: 150,
+            portal_score: 200,
+            multiball_ring_threshold: 10,
+            multiball_score: 600,
+            timer_bonus_seconds: 60,
+            timer_bonus_score: 500,
+            timer_bonus_multiplier: 1.5,
+            tilt_penalty_1: -2_000,
+            tilt_penalty_2: -6_000,
+            boss_0_hp: 64_000,
+            boss_1_hp: 128_000,
+            boss_2_hp: 512_000,
+            boss_0_difficulty_scale: 1.0,
+            boss_1_difficulty_scale: 1.6,
+            boss_2_difficulty_scale: 2.4,
+            endless_base_difficulty_scale: 2.4,
+            endless_level_scale_exponent: 1.3,
+            combo_buffer_max: 10,
+            combo_detection_window_ms: 2_000,
+            combo_penalty_repeat: 7,
+            combo_penalty_pts: 2_000,
+            combo_2_bonus: 0,
+            combo_3_bonus: 0,
+            combo_4_bonus: 1_000,
+            combo_5_bonus: 2_000,
+            combo_6_bonus: 2_000,
+            combo_7_bonus: 2_000,
+            combo_8_bonus: 2_000,
+            combo_9_bonus: 1_500,
+            combo_10_bonus: 1_500,
+            combo_11_bonus: 1_550,
+            combo_14_bonus: 2_000,
+            combo_15_bonus: 2_000,
+            combo_16_bonus: 2_000,
+            enforcer_charge_max: 80,
+            enforcer_weight_bumper: 1.0,
+            enforcer_weight_rail: 0.3,
+            enforcer_weight_combo: 1.0,
+            enforcer_weight_other: 1.0,
+            viper_charge_max: 80,
+            viper_ulti_duration_ms: 8_000,
+            viper_rampage_multiplier: 5.0,
+            ghost_charge_max: 60,
+            oracle_charge_max: 80,
+            oracle_ulti_duration_ms: 5_000,
+            oracle_slow_factor: 0.25,
+            oracle_time_rate: 1.0,
+            streak_window_ms: 2_000,
+            streak_tier_1_count: 2,
+            streak_tier_2_count: 5,
+            streak_tier_3_count: 10,
+            streak_tier_1_multiplier: 1.5,
+            streak_tier_2_multiplier: 2.0,
+            streak_tier_3_multiplier: 3.0,
+            rail_tick_interval_ms: 100,
+            rail_max_session_ms: 10_000,
+            rail_base_score: 4,
+            rail_max_fib_step: 7,
+            boss_death_anim_ms: 3_000,
+            boss_score_threshold: 15_000,
+            pve_tick_interval_ms: 250,
+        }
+    }
+}
+
+static CONFIG: LazyLock<RwLock<GameConfig>> = LazyLock::new(|| RwLock::new(GameConfig::default()));
+
+pub fn get() -> RwLockReadGuard<'static, GameConfig> {
+    CONFIG.read().expect("game config lock poisoned")
+}
+
+pub fn set(cfg: GameConfig) {
+    *CONFIG.write().expect("game config lock poisoned") = cfg;
+}

@@ -1,8 +1,3 @@
-use crate::engine::config::{
-    ENFORCER_CHARGE_MAX, ENFORCER_WEIGHT_BUMPER, ENFORCER_WEIGHT_COMBO, ENFORCER_WEIGHT_OTHER,
-    ENFORCER_WEIGHT_RAIL, GHOST_CHARGE_MAX, ORACLE_CHARGE_MAX, ORACLE_TIME_RATE,
-    ORACLE_ULTI_DURATION_MS, VIPER_CHARGE_MAX, VIPER_ULTI_DURATION_MS,
-};
 use crate::player::personnages::character_stats::{CharacterChargeProfile, CharacterStats};
 
 #[derive(Debug, Clone)]
@@ -19,7 +14,7 @@ pub enum UltiShape {
 pub trait Character: Send + Sync {
     fn slug(&self) -> &'static str;
     fn name(&self) -> &'static str;
-    fn stats(&self) -> &CharacterStats;
+    fn stats(&self) -> CharacterStats;
     fn ulti_id(&self) -> &'static str;
     fn ulti_shape(&self) -> UltiShape;
 }
@@ -36,18 +31,18 @@ impl Character for Enforcer {
     fn name(&self) -> &'static str {
         "KEENU"
     }
-    fn stats(&self) -> &CharacterStats {
-        static STATS: CharacterStats = CharacterStats {
+    fn stats(&self) -> CharacterStats {
+        let cfg = crate::engine::config::get();
+        CharacterStats {
             charge_profile: CharacterChargeProfile {
-                charge_max: ENFORCER_CHARGE_MAX,
-                weight_bumper: ENFORCER_WEIGHT_BUMPER,
-                weight_rail: ENFORCER_WEIGHT_RAIL,
-                weight_combo: ENFORCER_WEIGHT_COMBO,
-                weight_other: ENFORCER_WEIGHT_OTHER,
+                charge_max: cfg.enforcer_charge_max,
+                weight_bumper: cfg.enforcer_weight_bumper,
+                weight_rail: cfg.enforcer_weight_rail,
+                weight_combo: cfg.enforcer_weight_combo,
+                weight_other: cfg.enforcer_weight_other,
                 time_rate: 0.0,
             },
-        };
-        &STATS
+        }
     }
     fn ulti_id(&self) -> &'static str {
         "multiball_split"
@@ -64,25 +59,25 @@ impl Character for Viper {
     fn name(&self) -> &'static str {
         "VIPER"
     }
-    fn stats(&self) -> &CharacterStats {
-        static STATS: CharacterStats = CharacterStats {
+    fn stats(&self) -> CharacterStats {
+        let cfg = crate::engine::config::get();
+        CharacterStats {
             charge_profile: CharacterChargeProfile {
-                charge_max: VIPER_CHARGE_MAX,
+                charge_max: cfg.viper_charge_max,
                 weight_bumper: 1.0,
                 weight_rail: 1.0,
                 weight_combo: 1.0,
                 weight_other: 1.0,
                 time_rate: 0.0,
             },
-        };
-        &STATS
+        }
     }
     fn ulti_id(&self) -> &'static str {
         "rampage"
     }
     fn ulti_shape(&self) -> UltiShape {
         UltiShape::Sustained {
-            duration_ms: VIPER_ULTI_DURATION_MS,
+            duration_ms: crate::engine::config::get().viper_ulti_duration_ms,
             cancellable: false,
         }
     }
@@ -95,18 +90,18 @@ impl Character for Ghost {
     fn name(&self) -> &'static str {
         "GHOST"
     }
-    fn stats(&self) -> &CharacterStats {
-        static STATS: CharacterStats = CharacterStats {
+    fn stats(&self) -> CharacterStats {
+        let cfg = crate::engine::config::get();
+        CharacterStats {
             charge_profile: CharacterChargeProfile {
-                charge_max: GHOST_CHARGE_MAX,
+                charge_max: cfg.ghost_charge_max,
                 weight_bumper: 1.0,
                 weight_rail: 1.0,
                 weight_combo: 1.0,
                 weight_other: 1.0,
                 time_rate: 0.0,
             },
-        };
-        &STATS
+        }
     }
     fn ulti_id(&self) -> &'static str {
         "mimic"
@@ -123,25 +118,25 @@ impl Character for Oracle {
     fn name(&self) -> &'static str {
         "ORACLE"
     }
-    fn stats(&self) -> &CharacterStats {
-        static STATS: CharacterStats = CharacterStats {
+    fn stats(&self) -> CharacterStats {
+        let cfg = crate::engine::config::get();
+        CharacterStats {
             charge_profile: CharacterChargeProfile {
-                charge_max: ORACLE_CHARGE_MAX,
+                charge_max: cfg.oracle_charge_max,
                 weight_bumper: 1.0,
                 weight_rail: 1.0,
                 weight_combo: 1.0,
                 weight_other: 1.0,
-                time_rate: ORACLE_TIME_RATE,
+                time_rate: cfg.oracle_time_rate,
             },
-        };
-        &STATS
+        }
     }
     fn ulti_id(&self) -> &'static str {
         "time_slow"
     }
     fn ulti_shape(&self) -> UltiShape {
         UltiShape::Sustained {
-            duration_ms: ORACLE_ULTI_DURATION_MS,
+            duration_ms: crate::engine::config::get().oracle_ulti_duration_ms,
             cancellable: true,
         }
     }
