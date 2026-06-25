@@ -69,10 +69,18 @@ Generate a token with the built-in CLI command:
 SCREEN_JWT_SECRET='your-secret' cargo run -p api -- generate-admin-token
 
 # Docker (secret is already injected via the container env)
-docker compose run --rm api generate-admin-token
+docker compose run --rm api app generate-admin-token
 
 # Or inside a running container
-docker exec <container_name> /app/api generate-admin-token
+docker exec <container_name> app generate-admin-token
+```
+```bash
+# Inside the running container
+docker exec backend-api-1 app generate-admin-token
+```
+```bash
+# Or with a fresh container (env vars injected from compose)
+docker compose run --rm api app generate-admin-token
 ```
 
 Output: `ADMIN_TOKEN=eyJ…` — copy the value and use it as the Bearer token.
