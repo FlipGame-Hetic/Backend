@@ -1,9 +1,6 @@
 use std::time::{Duration, Instant};
 
-use crate::engine::config::{
-    STREAK_TIER_1_COUNT, STREAK_TIER_1_MULTIPLIER, STREAK_TIER_2_COUNT, STREAK_TIER_2_MULTIPLIER,
-    STREAK_TIER_3_COUNT, STREAK_TIER_3_MULTIPLIER, STREAK_WINDOW_MS,
-};
+use crate::engine::config;
 
 pub struct StreakState {
     count: u32,
@@ -23,9 +20,10 @@ impl StreakState {
     /// `streak_armed` is `true` if the new tier is greater than 0.
     pub fn record(&mut self, now: Instant) -> (bool, bool) {
         let prev_tier = self.tier();
+        let window_ms = config::get().streak_window_ms;
         let in_window = self
             .last_at
-            .is_some_and(|t| now.duration_since(t) <= Duration::from_millis(STREAK_WINDOW_MS));
+            .is_some_and(|t| now.duration_since(t) <= Duration::from_millis(window_ms));
         if in_window {
             self.count += 1;
         } else {
@@ -42,11 +40,12 @@ impl StreakState {
     }
 
     fn tier(&self) -> u8 {
-        if self.count >= STREAK_TIER_3_COUNT {
+        let cfg = config::get();
+        if self.count >= cfg.streak_tier_3_count {
             3
-        } else if self.count >= STREAK_TIER_2_COUNT {
+        } else if self.count >= cfg.streak_tier_2_count {
             2
-        } else if self.count >= STREAK_TIER_1_COUNT {
+        } else if self.count >= cfg.streak_tier_1_count {
             1
         } else {
             0
@@ -54,10 +53,11 @@ impl StreakState {
     }
 
     pub fn current(&self) -> f32 {
+        let cfg = config::get();
         match self.tier() {
-            1 => STREAK_TIER_1_MULTIPLIER,
-            2 => STREAK_TIER_2_MULTIPLIER,
-            3 => STREAK_TIER_3_MULTIPLIER,
+            1 => cfg.streak_tier_1_multiplier,
+            2 => cfg.streak_tier_2_multiplier,
+            3 => cfg.streak_tier_3_multiplier,
             _ => 1.0,
         }
     }
@@ -86,7 +86,8 @@ mod tests {
         for i in 0..6u64 {
             s.record(now + Duration::from_millis(i * 100));
         }
-        assert!((s.current() - STREAK_TIER_2_MULTIPLIER).abs() < f32::EPSILON);
+        let tier_2_multiplier = config::get().streak_tier_2_multiplier;
+        assert!((s.current() - tier_2_multiplier).abs() < f32::EPSILON);
     }
 
     #[test]
@@ -96,8 +97,8 @@ mod tests {
         for i in 0..10u64 {
             s.record(now + Duration::from_millis(i * 100));
         }
-        // Gap beyond window
-        s.record(now + Duration::from_millis(10 * 100 + STREAK_WINDOW_MS + 1));
+        let window_ms = config::get().streak_window_ms;
+        s.record(now + Duration::from_millis(10 * 100 + window_ms + 1));
         assert!((s.current() - 1.0).abs() < f32::EPSILON);
     }
 
@@ -105,15 +106,16 @@ mod tests {
     fn tier_change_detected() {
         let mut s = StreakState::new();
         let now = Instant::now();
+        let tier_1_count = config::get().streak_tier_1_count;
         let mut tier_changed = false;
-        for i in 0..STREAK_TIER_1_COUNT as u64 {
+        for i in 0..tier_1_count as u64 {
             let (tc, _) = s.record(now + Duration::from_millis(i * 100));
             tier_changed = tc;
         }
         assert!(
             tier_changed,
             "should detect tier change at count={}",
-            STREAK_TIER_1_COUNT
+            tier_1_count
         );
     }
 }

@@ -1,13 +1,23 @@
 use api::app;
 use api::config::ApiConfig;
+use api::modules::admin::auth::generate_admin_token;
+use api::modules::admin::service::AdminService;
 use sqlx::SqlitePool;
 use sqlx::sqlite::SqliteConnectOptions;
 use std::str::FromStr;
-use tracing::{error, info};
+use tracing::{error, info, warn};
 use tracing_subscriber::{EnvFilter, fmt};
 
 #[tokio::main]
 async fn main() {
+    if std::env::args().any(|a| a == "generate-admin-token") {
+        let secret = std::env::var("SCREEN_JWT_SECRET")
+            .unwrap_or_else(|_| "flipper-dev-secret-change-in-prod".to_owned());
+        let token = generate_admin_token(secret.as_bytes());
+        println!("ADMIN_TOKEN={token}");
+        return;
+    }
+
     init_tracing();
 
     let config = match ApiConfig::from_env() {
@@ -40,6 +50,16 @@ async fn main() {
     }
 
     info!(url = %config.database_url, "Database ready");
+
+    match AdminService::load_config(&pool).await {
+        Some(cfg) => {
+            game_logic::engine::config::set(cfg);
+            info!("Game config loaded from database");
+        }
+        None => {
+            warn!("No game config found in DB, using compiled defaults");
+        }
+    }
 
     let addr = config.socket_addr();
     info!(port = config.port, "Starting api server");

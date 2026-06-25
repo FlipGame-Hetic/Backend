@@ -2,100 +2,97 @@ use std::collections::VecDeque;
 use std::time::Instant;
 
 use crate::combo::model::{ButtonPress, ComboDefinition, ComboEffect, ComboResult};
-use crate::engine::config::{
-    COMBO_2_BONUS, COMBO_3_BONUS, COMBO_4_BONUS, COMBO_5_BONUS, COMBO_6_BONUS, COMBO_7_BONUS,
-    COMBO_8_BONUS, COMBO_9_BONUS, COMBO_10_BONUS, COMBO_11_BONUS, COMBO_14_BONUS, COMBO_15_BONUS,
-    COMBO_16_BONUS, COMBO_BUFFER_MAX, COMBO_DETECTION_WINDOW_MS, COMBO_PENALTY_PTS,
-    COMBO_PENALTY_REPEAT,
-};
+use crate::engine::config;
 
 fn combo_table() -> Vec<ComboDefinition> {
     use ButtonPress::{Left as G, Right as D};
+    let cfg = config::get();
+    let window = cfg.combo_detection_window_ms;
     vec![
         // 7-button combos first (longest → highest priority)
         // Very hard: pure alternating
         ComboDefinition {
             id: 14,
             sequence: vec![D, G, D, G, D, G, D],
-            max_duration_ms: COMBO_DETECTION_WINDOW_MS,
-            bonus_pts: COMBO_14_BONUS,
+            max_duration_ms: window,
+            bonus_pts: cfg.combo_14_bonus,
         },
         ComboDefinition {
             id: 15,
             sequence: vec![G, G, D, G, D, D, G],
-            max_duration_ms: COMBO_DETECTION_WINDOW_MS,
-            bonus_pts: COMBO_15_BONUS,
+            max_duration_ms: window,
+            bonus_pts: cfg.combo_15_bonus,
         },
         ComboDefinition {
             id: 16,
             sequence: vec![D, D, G, D, G, G, D],
-            max_duration_ms: COMBO_DETECTION_WINDOW_MS,
-            bonus_pts: COMBO_16_BONUS,
+            max_duration_ms: window,
+            bonus_pts: cfg.combo_16_bonus,
         },
         // Standard 7-button combos
         ComboDefinition {
             id: 6,
             sequence: vec![G, G, D, D, G, G, D],
-            max_duration_ms: COMBO_DETECTION_WINDOW_MS,
-            bonus_pts: COMBO_6_BONUS,
+            max_duration_ms: window,
+            bonus_pts: cfg.combo_6_bonus,
         },
         ComboDefinition {
             id: 7,
             sequence: vec![G, G, D, G, D, G, G],
-            max_duration_ms: COMBO_DETECTION_WINDOW_MS,
-            bonus_pts: COMBO_7_BONUS,
+            max_duration_ms: window,
+            bonus_pts: cfg.combo_7_bonus,
         },
         ComboDefinition {
             id: 8,
             sequence: vec![D, D, D, G, G, D, G],
-            max_duration_ms: COMBO_DETECTION_WINDOW_MS,
-            bonus_pts: COMBO_8_BONUS,
+            max_duration_ms: window,
+            bonus_pts: cfg.combo_8_bonus,
         },
         // 6-button combos
         // Hard: alternating patterns
         ComboDefinition {
             id: 9,
             sequence: vec![D, G, D, G, D, D],
-            max_duration_ms: COMBO_DETECTION_WINDOW_MS,
-            bonus_pts: COMBO_9_BONUS,
+            max_duration_ms: window,
+            bonus_pts: cfg.combo_9_bonus,
         },
         ComboDefinition {
             id: 10,
             sequence: vec![G, G, D, G, D, D],
-            max_duration_ms: COMBO_DETECTION_WINDOW_MS,
-            bonus_pts: COMBO_10_BONUS,
+            max_duration_ms: window,
+            bonus_pts: cfg.combo_10_bonus,
         },
         ComboDefinition {
             id: 11,
             sequence: vec![D, G, G, D, G, D],
-            max_duration_ms: COMBO_DETECTION_WINDOW_MS,
-            bonus_pts: COMBO_11_BONUS,
+            max_duration_ms: window,
+            bonus_pts: cfg.combo_11_bonus,
         },
         // Standard 6-button combos
         ComboDefinition {
             id: 3,
             sequence: vec![G, G, D, D, D, D],
-            max_duration_ms: COMBO_DETECTION_WINDOW_MS,
-            bonus_pts: COMBO_3_BONUS,
+            max_duration_ms: window,
+            bonus_pts: cfg.combo_3_bonus,
         },
         ComboDefinition {
             id: 4,
             sequence: vec![G, G, D, D, D, G],
-            max_duration_ms: COMBO_DETECTION_WINDOW_MS,
-            bonus_pts: COMBO_4_BONUS,
+            max_duration_ms: window,
+            bonus_pts: cfg.combo_4_bonus,
         },
         ComboDefinition {
             id: 5,
             sequence: vec![G, G, D, G, G, D],
-            max_duration_ms: COMBO_DETECTION_WINDOW_MS,
-            bonus_pts: COMBO_5_BONUS,
+            max_duration_ms: window,
+            bonus_pts: cfg.combo_5_bonus,
         },
         // 5-button combos
         ComboDefinition {
             id: 2,
             sequence: vec![G, G, D, D, G],
-            max_duration_ms: COMBO_DETECTION_WINDOW_MS,
-            bonus_pts: COMBO_2_BONUS,
+            max_duration_ms: window,
+            bonus_pts: cfg.combo_2_bonus,
         },
     ]
 }
@@ -107,14 +104,16 @@ pub struct ComboDetector {
 
 impl ComboDetector {
     pub fn new() -> Self {
+        let buffer_max = config::get().combo_buffer_max;
         Self {
-            buffer: VecDeque::with_capacity(COMBO_BUFFER_MAX),
+            buffer: VecDeque::with_capacity(buffer_max),
             table: combo_table(),
         }
     }
 
     pub fn push(&mut self, button: ButtonPress, now: Instant) -> ComboResult {
-        if self.buffer.len() >= COMBO_BUFFER_MAX {
+        let buffer_max = config::get().combo_buffer_max;
+        if self.buffer.len() >= buffer_max {
             self.buffer.pop_front();
         }
         self.buffer.push_back((button, now));
@@ -172,14 +171,15 @@ impl ComboDetector {
     }
 
     fn check_penalty(&self) -> Option<ComboResult> {
-        if self.buffer.len() < COMBO_PENALTY_REPEAT {
+        let cfg = config::get();
+        if self.buffer.len() < cfg.combo_penalty_repeat {
             return None;
         }
         let last: Vec<&ButtonPress> = self
             .buffer
             .iter()
             .rev()
-            .take(COMBO_PENALTY_REPEAT)
+            .take(cfg.combo_penalty_repeat)
             .map(|(p, _)| p)
             .collect();
 
@@ -188,7 +188,7 @@ impl ComboDetector {
 
         if all_left || all_right {
             Some(ComboResult::Penalty {
-                pts: COMBO_PENALTY_PTS,
+                pts: cfg.combo_penalty_pts,
             })
         } else {
             None
@@ -243,12 +243,7 @@ mod tests {
         let mut d = ComboDetector::new();
         let now = Instant::now();
         let result = press_seq(&mut d, &[ButtonPress::Right; 7], now);
-        assert!(matches!(
-            result,
-            ComboResult::Penalty {
-                pts: COMBO_PENALTY_PTS
-            }
-        ));
+        assert!(matches!(result, ComboResult::Penalty { .. }));
     }
 
     #[test]
@@ -256,12 +251,7 @@ mod tests {
         let mut d = ComboDetector::new();
         let now = Instant::now();
         let result = press_seq(&mut d, &[ButtonPress::Left; 7], now);
-        assert!(matches!(
-            result,
-            ComboResult::Penalty {
-                pts: COMBO_PENALTY_PTS
-            }
-        ));
+        assert!(matches!(result, ComboResult::Penalty { .. }));
     }
 
     #[test]

@@ -2,7 +2,7 @@ use std::time::Instant;
 
 use shared::screen::{ScreenEnvelope, ScreenEventType, ScreenId, ScreenTarget};
 
-use crate::engine::config::{BOSS_0_HP, BOSS_DEATH_ANIM_MS, BOSS_SCORE_THRESHOLD};
+use crate::engine::config;
 use crate::engine::events::{GameEvent, GameOverReason};
 use crate::engine::pve::difficulty::{boss_damage_to_health, scale_hp};
 use crate::engine::pve::ennemy::boss::Boss;
@@ -38,7 +38,6 @@ impl PveEngine {
 
         match event {
             GameEvent::StartGame => {
-                // Boss spawns only once BOSS_SCORE_THRESHOLD points are scored.
                 self.state.phase = PvePhase::WaitingForScore;
                 self.state.next_boss_index = 0;
                 self.state.score_accumulated = 0;
@@ -63,7 +62,7 @@ impl PveEngine {
     /// Apply a positive score delta.
     ///
     /// - `WaitingForScore`: accumulates toward the spawn threshold; spawns the next boss
-    ///   once BOSS_SCORE_THRESHOLD points have been scored since the last boss event.
+    ///   once `boss_score_threshold` new points have been scored since the last boss event.
     /// - `Fighting`: applies damage to the current boss.
     /// - All other phases: no-op.
     pub fn on_score_delta(&mut self, delta: u64) -> (Vec<ScreenEnvelope>, Vec<GameEvent>) {
@@ -77,7 +76,8 @@ impl PveEngine {
         match self.state.phase {
             PvePhase::WaitingForScore => {
                 self.state.score_accumulated = self.state.score_accumulated.saturating_add(delta);
-                if self.state.score_accumulated >= BOSS_SCORE_THRESHOLD {
+                let threshold = config::get().boss_score_threshold;
+                if self.state.score_accumulated >= threshold {
                     self.state.score_accumulated = 0;
                     let next = self.state.next_boss_index;
                     self.spawn_next(next, &mut envelopes);
@@ -114,9 +114,9 @@ impl PveEngine {
 
     /// Advance the death-animation cooldown.
     ///
-    /// Call this periodically from the service layer. Once BOSS_DEATH_ANIM_MS have
+    /// Call this periodically from the service layer. Once `boss_death_anim_ms` have
     /// elapsed, emits BossCleared and transitions to WaitingForScore so the next boss
-    /// spawns after BOSS_SCORE_THRESHOLD new points are scored.
+    /// spawns after `boss_score_threshold` new points are scored.
     pub fn tick(&mut self, now: Instant) -> (Vec<ScreenEnvelope>, Vec<GameEvent>) {
         let mut envelopes = Vec::new();
         let extra_events = Vec::new();
@@ -131,7 +131,7 @@ impl PveEngine {
         };
 
         let elapsed_ms = now.duration_since(cooldown.defeated_at).as_millis() as u64;
-        if elapsed_ms >= BOSS_DEATH_ANIM_MS {
+        if elapsed_ms >= config::get().boss_death_anim_ms {
             let boss_id = self.boss.kind.id();
             let next_index = cooldown.next_boss_index;
             self.state.cooldown = None;
@@ -171,7 +171,7 @@ impl PveEngine {
             } else {
                 // Endless: respawn AUTO with scaled HP
                 let level = self.state.endless_level;
-                let hp = scale_hp(BOSS_0_HP, 3, level);
+                let hp = scale_hp(config::get().boss_0_hp, 3, level);
                 self.boss = Boss::new_endless(BossKind::AUTO, level);
                 self.state.boss_health.reset_with_new_max(hp);
                 self.state.phase = PvePhase::Fighting;
@@ -251,12 +251,11 @@ fn make_event_envelope(event_type: ScreenEventType, payload: serde_json::Value) 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::engine::config::{BOSS_SCORE_THRESHOLD, DEFAULT_LIVES};
     use crate::engine::states::GameState;
     use std::time::Duration;
 
     fn make_state() -> GameState {
-        GameState::new(DEFAULT_LIVES)
+        GameState::new(config::get().default_lives)
     }
 
     /// Returns a PveEngine with the first boss already active (threshold cleared).
@@ -264,7 +263,7 @@ mod tests {
         let mut pve = PveEngine::new();
         let mut state = make_state();
         pve.on_event(&GameEvent::StartGame, &mut state);
-        pve.on_score_delta(BOSS_SCORE_THRESHOLD);
+        pve.on_score_delta(config::get().boss_score_threshold);
         pve
     }
 
@@ -288,8 +287,10 @@ mod tests {
         let mut state = make_state();
         pve.on_event(&GameEvent::StartGame, &mut state);
 
+        let threshold = config::get().boss_score_threshold;
+
         // One point short — still waiting
-        let (envelopes, _) = pve.on_score_delta(BOSS_SCORE_THRESHOLD - 1);
+        let (envelopes, _) = pve.on_score_delta(threshold - 1);
         assert!(
             !envelopes
                 .iter()
@@ -348,7 +349,8 @@ mod tests {
         let hp = pve.boss_max_hp();
         pve.on_score_delta(hp as u64);
 
-        let future = Instant::now() + Duration::from_millis(BOSS_DEATH_ANIM_MS + 100);
+        let death_anim_ms = config::get().boss_death_anim_ms;
+        let future = Instant::now() + Duration::from_millis(death_anim_ms + 100);
         let (envelopes, _) = pve.tick(future);
         assert!(
             envelopes
@@ -356,7 +358,6 @@ mod tests {
                 .any(|e| e.event_type == ScreenEventType::BossCleared),
             "expected BossCleared after death animation"
         );
-        // After death anim, engine waits for score threshold (not a timer).
         assert_eq!(*pve.phase(), PvePhase::WaitingForScore);
     }
 
@@ -367,13 +368,16 @@ mod tests {
         // Kill boss 0
         pve.on_score_delta(hp as u64);
 
+        let death_anim_ms = config::get().boss_death_anim_ms;
+        let threshold = config::get().boss_score_threshold;
+
         // Advance past death animation → WaitingForScore
-        let t1 = Instant::now() + Duration::from_millis(BOSS_DEATH_ANIM_MS + 100);
+        let t1 = Instant::now() + Duration::from_millis(death_anim_ms + 100);
         pve.tick(t1);
         assert_eq!(*pve.phase(), PvePhase::WaitingForScore);
 
         // Score threshold triggers boss 1
-        let (envelopes, _) = pve.on_score_delta(BOSS_SCORE_THRESHOLD);
+        let (envelopes, _) = pve.on_score_delta(threshold);
         assert!(
             envelopes
                 .iter()
@@ -408,26 +412,24 @@ mod tests {
         let mut state = make_state();
         pve.on_event(&GameEvent::StartGame, &mut state);
 
-        // Defeat all 3 story bosses; each cycle is:
-        //   score threshold → boss spawns → kill boss → death anim → WaitingForScore
         for _ in 0..3 {
-            // Reach score threshold to spawn the next boss
-            pve.on_score_delta(BOSS_SCORE_THRESHOLD);
+            let threshold = config::get().boss_score_threshold;
+            let death_anim_ms = config::get().boss_death_anim_ms;
+
+            pve.on_score_delta(threshold);
             assert_eq!(*pve.phase(), PvePhase::Fighting);
 
-            // Kill the boss
             let hp = pve.boss_max_hp();
             pve.on_score_delta(hp as u64);
             assert_eq!(*pve.phase(), PvePhase::Cooldown);
 
-            // Advance through death animation → WaitingForScore
-            let t1 = Instant::now() + Duration::from_millis(BOSS_DEATH_ANIM_MS + 100);
+            let t1 = Instant::now() + Duration::from_millis(death_anim_ms + 100);
             pve.tick(t1);
             assert_eq!(*pve.phase(), PvePhase::WaitingForScore);
         }
 
-        // After 3 bosses, next threshold triggers VictoireFinale
-        let (envelopes, _) = pve.on_score_delta(BOSS_SCORE_THRESHOLD);
+        let threshold = config::get().boss_score_threshold;
+        let (envelopes, _) = pve.on_score_delta(threshold);
         assert!(
             envelopes
                 .iter()
@@ -436,7 +438,6 @@ mod tests {
         );
         assert_eq!(*pve.phase(), PvePhase::Victory);
 
-        // BallLost with 0 lives still triggers GameOver from on_event
         state.lives = 0;
         let (_, events) = pve.on_event(&GameEvent::BallLost, &mut state);
         assert!(
@@ -462,10 +463,9 @@ mod tests {
 
     #[test]
     fn envelopes_use_game_engine_sender() {
-        // Score accumulated in WaitingForScore — no envelopes until threshold
         let mut pve = PveEngine::new();
-        let (envelopes, _) = pve.on_score_delta(BOSS_SCORE_THRESHOLD);
-        // Threshold reached → BossUpdate emitted from GameEngine
+        let threshold = config::get().boss_score_threshold;
+        let (envelopes, _) = pve.on_score_delta(threshold);
         for env in &envelopes {
             assert_eq!(env.from, ScreenId::GameEngine);
         }

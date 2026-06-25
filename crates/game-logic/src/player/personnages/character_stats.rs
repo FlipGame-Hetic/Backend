@@ -1,3 +1,4 @@
+#[derive(Clone, Copy)]
 pub struct CharacterChargeProfile {
     pub charge_max: u32,
     pub weight_bumper: f32,
@@ -8,6 +9,7 @@ pub struct CharacterChargeProfile {
     pub time_rate: f32,
 }
 
+#[derive(Clone, Copy)]
 pub struct CharacterStats {
     pub charge_profile: CharacterChargeProfile,
 }

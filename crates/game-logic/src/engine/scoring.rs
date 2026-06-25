@@ -1,18 +1,15 @@
-use crate::engine::config::{
-    BUMPER_SCORE, BUMPER_TRIANGLE_SCORE, PORTAL_SCORE, RAIL_BASE_SCORE, RAIL_MAX_FIB_STEP,
-    TIMER_BONUS_MULTIPLIER, TIMER_BONUS_SCORE,
-};
+use crate::engine::config;
 
 pub fn score_bumper(multiplier: f32) -> u64 {
-    (BUMPER_SCORE as f32 * multiplier) as u64
+    (config::get().bumper_score as f32 * multiplier) as u64
 }
 
 pub fn score_bumper_triangle(multiplier: f32) -> u64 {
-    (BUMPER_TRIANGLE_SCORE as f32 * multiplier) as u64
+    (config::get().bumper_triangle_score as f32 * multiplier) as u64
 }
 
 pub fn score_portal_bonus() -> u64 {
-    PORTAL_SCORE as u64
+    config::get().portal_score as u64
 }
 
 pub fn apply_tilt_penalty(score: u64, penalty: i64) -> u64 {
@@ -24,9 +21,10 @@ pub fn apply_tilt_penalty(score: u64, penalty: i64) -> u64 {
 }
 
 pub fn timer_bonus(score: u64, balls_lost: u32) -> u64 {
+    let cfg = config::get();
     if balls_lost == 0 {
-        let with_bonus = score.saturating_add(TIMER_BONUS_SCORE as u64);
-        (with_bonus as f32 * TIMER_BONUS_MULTIPLIER) as u64
+        let with_bonus = score.saturating_add(cfg.timer_bonus_score as u64);
+        (with_bonus as f32 * cfg.timer_bonus_multiplier) as u64
     } else {
         score
     }
@@ -52,34 +50,35 @@ pub fn fibonacci(n: u32) -> u64 {
 }
 
 pub fn rail_tick_score(fib_step: u32, multiplier: f32) -> u64 {
-    let fib = fibonacci(fib_step.min(RAIL_MAX_FIB_STEP)) as f32;
-    (RAIL_BASE_SCORE as f32 * fib * multiplier) as u64
+    let cfg = config::get();
+    let fib = fibonacci(fib_step.min(cfg.rail_max_fib_step)) as f32;
+    (cfg.rail_base_score as f32 * fib * multiplier) as u64
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::engine::config::{
-        BUMPER_SCORE, BUMPER_TRIANGLE_SCORE, RAIL_BASE_SCORE, TIMER_BONUS_MULTIPLIER,
-        TIMER_BONUS_SCORE,
-    };
 
     #[test]
     fn test_bumper_with_multiplier() {
-        assert_eq!(score_bumper(1.5), (BUMPER_SCORE as f32 * 1.5) as u64);
+        let bumper_score = config::get().bumper_score;
+        assert_eq!(score_bumper(1.5), (bumper_score as f32 * 1.5) as u64);
     }
 
     #[test]
     fn test_bumper_triangle_with_multiplier() {
+        let bumper_triangle_score = config::get().bumper_triangle_score;
         assert_eq!(
             score_bumper_triangle(2.0),
-            (BUMPER_TRIANGLE_SCORE as f32 * 2.0) as u64
+            (bumper_triangle_score as f32 * 2.0) as u64
         );
     }
 
     #[test]
     fn test_timer_bonus_no_lives_lost() {
-        let expected = ((1_000 + TIMER_BONUS_SCORE as u64) as f32 * TIMER_BONUS_MULTIPLIER) as u64;
+        let cfg = config::get();
+        let expected =
+            ((1_000 + cfg.timer_bonus_score as u64) as f32 * cfg.timer_bonus_multiplier) as u64;
         assert_eq!(timer_bonus(1_000, 0), expected);
     }
 
@@ -120,23 +119,25 @@ mod tests {
 
     #[test]
     fn test_rail_tick_score_step_0_no_multiplier() {
-        assert_eq!(rail_tick_score(0, 1.0), RAIL_BASE_SCORE as u64);
+        let rail_base_score = config::get().rail_base_score;
+        assert_eq!(rail_tick_score(0, 1.0), rail_base_score as u64);
     }
 
     #[test]
     fn test_rail_tick_score_step_4_with_multiplier() {
-        // fib(4) = 5
+        let rail_base_score = config::get().rail_base_score;
         assert_eq!(
             rail_tick_score(4, 2.0),
-            (RAIL_BASE_SCORE as f32 * fibonacci(4) as f32 * 2.0) as u64
+            (rail_base_score as f32 * fibonacci(4) as f32 * 2.0) as u64
         );
     }
 
     #[test]
     fn test_rail_tick_score_capped_at_max_fib_step() {
+        let rail_max_fib_step = config::get().rail_max_fib_step;
         assert_eq!(
             rail_tick_score(100, 1.0),
-            rail_tick_score(RAIL_MAX_FIB_STEP, 1.0)
+            rail_tick_score(rail_max_fib_step, 1.0)
         );
     }
 }
