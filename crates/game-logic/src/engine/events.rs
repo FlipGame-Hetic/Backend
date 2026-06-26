@@ -1,7 +1,10 @@
+//! All events that can flow through the game engine's `process` method.
+
 use shared::model::ButtonId;
 
 use crate::combo::ButtonPress;
 
+/// Which flipper button was pressed (L1 = Left, R1 = Right).
 #[derive(Debug, Clone)]
 pub enum ButtonSide {
     Left,
@@ -9,6 +12,7 @@ pub enum ButtonSide {
 }
 
 impl ButtonSide {
+    /// Map a raw hardware `ButtonId` to a side; returns `None` for non-flipper buttons.
     pub fn from_button_id(id: &ButtonId) -> Option<Self> {
         match id {
             ButtonId::L1 => Some(Self::Left),
@@ -18,6 +22,7 @@ impl ButtonSide {
     }
 }
 
+/// Why the game ended used in the final `GameOver` screen payload.
 #[derive(Debug, Clone)]
 pub enum GameOverReason {
     NoLivesLeft,
@@ -33,6 +38,9 @@ impl From<ButtonSide> for ButtonPress {
     }
 }
 
+/// Every distinct game event the engine can handle.
+/// The engine's `process` method pattern-matches on this enum and produces
+/// a list of `ScreenEnvelope`s to broadcast to the frontend.
 #[derive(Debug, Clone)]
 pub enum GameEvent {
     StartGame,
@@ -60,6 +68,7 @@ pub enum GameEvent {
     MultiballTriggered,
     MultiballWin,
     ScoreMultiplierActivated,
+    /// Kept for backward compatibility L2/R2 is now the authoritative trigger.
     UltimateActivated {
         player_id: String,
     },

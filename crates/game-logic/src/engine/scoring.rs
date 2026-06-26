@@ -1,3 +1,5 @@
+//! Pure scoring functions no state, just math on config values and inputs.
+
 use crate::engine::config;
 
 pub fn score_bumper(multiplier: f32) -> u64 {
@@ -12,6 +14,7 @@ pub fn score_portal_bonus() -> u64 {
     config::get().portal_score as u64
 }
 
+/// Deduct `penalty` from `score`, saturating at 0. Ignores non-negative values.
 pub fn apply_tilt_penalty(score: u64, penalty: i64) -> u64 {
     if penalty < 0 {
         score.saturating_sub(penalty.unsigned_abs())
@@ -20,6 +23,8 @@ pub fn apply_tilt_penalty(score: u64, penalty: i64) -> u64 {
     }
 }
 
+/// Add a flat bonus then apply a multiplier to the total score.
+/// Only awarded when no balls have been lost (clean run bonus).
 pub fn timer_bonus(score: u64, balls_lost: u32) -> u64 {
     let cfg = config::get();
     if balls_lost == 0 {
@@ -34,7 +39,7 @@ pub fn apply_multiplier(base: u64, multiplier: f32) -> u64 {
     (base as f32 * multiplier) as u64
 }
 
-/// Returns the nth Fibonacci number (1-indexed: F(0)=1, F(1)=1, F(2)=2, ...).
+/// Returns the nth Fibonacci number (1-indexed: F(0)=1, F(1)=1, F(2)=2, …).
 pub fn fibonacci(n: u32) -> u64 {
     if n <= 1 {
         return 1;
@@ -49,6 +54,8 @@ pub fn fibonacci(n: u32) -> u64 {
     b
 }
 
+/// Score for one rail tick: `base_score × fib(step)`, capped at `rail_max_fib_step`
+/// so the per-tick value doesn't grow unboundedly on very long rail sessions.
 pub fn rail_tick_score(fib_step: u32, multiplier: f32) -> u64 {
     let cfg = config::get();
     let fib = fibonacci(fib_step.min(cfg.rail_max_fib_step)) as f32;

@@ -1,3 +1,5 @@
+//! PVE subsystem — boss spawning, HP management, phase transitions, and death animation.
+
 pub mod difficulty;
 pub mod engine;
 pub mod ennemy;

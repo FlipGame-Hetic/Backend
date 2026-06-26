@@ -1,3 +1,5 @@
+//! PVE-specific events (currently unused — kept for future boss-phase logic).
+
 #[derive(Debug, Clone)]
 pub enum PveEvent {
     BossDefeated { boss_id: u8 },
