@@ -1,6 +1,7 @@
 use std::time::Instant;
 
 use crate::engine::config;
+use crate::engine::services::charge::{score_to_charge, time_to_charge};
 use crate::engine::states::GamePhase;
 
 use super::{ChargeSource, GameEngine};
@@ -17,15 +18,15 @@ impl GameEngine {
             return;
         }
         let delta_s = config::get().pve_tick_interval_ms as f32 / 1000.0;
-        self.state.time_charge_buffer += time_rate * delta_s;
-        let to_add = self.state.time_charge_buffer.floor() as u32;
-        if to_add > 0 {
-            self.state.time_charge_buffer -= to_add as f32;
+        let (gain, new_buffer) =
+            time_to_charge(time_rate, delta_s, self.state.time_charge_buffer);
+        self.state.time_charge_buffer = new_buffer;
+        if gain > 0 {
             let charge_max = stats.charge_profile.charge_max;
             self.state.ultimate_charge = self
                 .state
                 .ultimate_charge
-                .saturating_add(to_add)
+                .saturating_add(gain)
                 .min(charge_max);
         }
     }
@@ -37,24 +38,22 @@ impl GameEngine {
         if self.state.is_ulti_active(now) {
             return;
         }
-        let stats = self.character.stats();
-        let profile = stats.charge_profile;
+        let profile = self.character.stats().charge_profile;
         let weight = match source {
             ChargeSource::Bumper => profile.weight_bumper,
             ChargeSource::Rail => profile.weight_rail,
             ChargeSource::Combo => profile.weight_combo,
             ChargeSource::Other => profile.weight_other,
         };
-        let charge_ratio = config::get().ultime_charge_ratio;
-        let weighted = (base_pts as f32 * weight).round() as u32;
-        self.state.point_buffer = self.state.point_buffer.saturating_add(weighted);
-        let gain = self.state.point_buffer / charge_ratio;
-        self.state.point_buffer %= charge_ratio;
-        let charge_max = profile.charge_max;
-        self.state.ultimate_charge = self
-            .state
-            .ultimate_charge
-            .saturating_add(gain)
-            .min(charge_max);
+        let (new_charge, new_buffer) = score_to_charge(
+            base_pts,
+            weight,
+            self.state.point_buffer,
+            config::get().ultime_charge_ratio,
+            self.state.ultimate_charge,
+            profile.charge_max,
+        );
+        self.state.ultimate_charge = new_charge;
+        self.state.point_buffer = new_buffer;
     }
 }

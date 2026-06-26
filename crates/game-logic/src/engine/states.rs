@@ -135,11 +135,15 @@ impl GameState {
         let Some(ends_at) = self.ulti_ends_at else {
             return 0;
         };
-        if now >= ends_at || self.ulti_duration_ms == 0 {
+        if now >= ends_at {
             return 0;
         }
         let remaining_ms = ends_at.duration_since(now).as_millis() as u64;
-        ((self.ulti_start_charge as u64 * remaining_ms) / self.ulti_duration_ms) as u32
+        crate::engine::services::ulti::residual_charge(
+            self.ulti_start_charge,
+            remaining_ms,
+            self.ulti_duration_ms,
+        )
     }
 }
 

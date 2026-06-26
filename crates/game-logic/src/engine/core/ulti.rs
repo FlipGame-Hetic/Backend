@@ -3,15 +3,10 @@ use std::time::{Duration, Instant};
 use shared::screen::{ScreenEnvelope, ScreenEventType};
 
 use crate::engine::config;
+use crate::engine::services::ulti::{activation_min_charge_for, scale_duration};
 use crate::player::personnages::character::UltiShape;
 
 use super::{GHOST_CYCLE, GameEngine, make_event_envelope};
-
-/// Minimum charge required to activate a time_slow ulti at `ratio` of `charge_max`.
-/// Always returns at least 1 to avoid a zero threshold.
-pub(crate) fn activation_min_charge_for(charge_max: u32, ratio: f32) -> u32 {
-    ((charge_max as f32 * ratio).ceil() as u32).max(1)
-}
 
 impl GameEngine {
     /// Returns the ulti_id Ghost's next cycle would produce without advancing the index.
@@ -135,13 +130,7 @@ impl GameEngine {
                 duration_ms: full_duration,
                 cancellable,
             } => {
-                // Scale duration proportionally to the committed charge.
-                // At full charge the result is identical to the configured duration.
-                let actual = if charge_max > 0 {
-                    (*full_duration * activation_charge as u64 / charge_max as u64).max(1)
-                } else {
-                    *full_duration
-                };
+                let actual = scale_duration(*full_duration, activation_charge, charge_max);
                 self.state.ulti_ends_at = Some(now + Duration::from_millis(actual));
                 self.state.ulti_duration_ms = actual;
                 self.state.ulti_cancellable = *cancellable;
@@ -207,7 +196,9 @@ mod tests {
     use crate::engine::config;
     use crate::engine::events::GameEvent;
 
-    use super::{GameEngine, activation_min_charge_for};
+    use crate::engine::services::ulti::activation_min_charge_for;
+
+    use super::GameEngine;
 
     fn oracle_engine() -> GameEngine {
         let mut e = GameEngine::new("oracle");

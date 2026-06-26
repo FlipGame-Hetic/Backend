@@ -6,6 +6,7 @@ pub mod core;
 pub mod events;
 pub mod pve;
 pub mod scoring;
+pub mod services;
 pub mod states;
 
 pub use core::GameEngine;
