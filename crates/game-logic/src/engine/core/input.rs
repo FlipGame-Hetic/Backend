@@ -158,14 +158,20 @@ mod tests {
     fn l1_press_emits_flipper_left() {
         let mut engine = started();
         let evs = engine.handle_inbound(&btn(ButtonId::L1, 1));
-        assert!(evs.iter().any(|e| e.event_type == ScreenEventType::FlipperLeft));
+        assert!(
+            evs.iter()
+                .any(|e| e.event_type == ScreenEventType::FlipperLeft)
+        );
     }
 
     #[test]
     fn r1_press_emits_flipper_right() {
         let mut engine = started();
         let evs = engine.handle_inbound(&btn(ButtonId::R1, 1));
-        assert!(evs.iter().any(|e| e.event_type == ScreenEventType::FlipperRight));
+        assert!(
+            evs.iter()
+                .any(|e| e.event_type == ScreenEventType::FlipperRight)
+        );
     }
 
     #[test]
@@ -173,9 +179,15 @@ mod tests {
         let mut engine = started();
         // state=0 → release; should not trigger ButtonPressed (no combo push)
         let evs = engine.handle_inbound(&btn(ButtonId::L1, 0));
-        assert!(evs.iter().any(|e| e.event_type == ScreenEventType::FlipperLeft));
+        assert!(
+            evs.iter()
+                .any(|e| e.event_type == ScreenEventType::FlipperLeft)
+        );
         // No ScoreUpdate/ScoreDelta from combo processing
-        assert!(!evs.iter().any(|e| e.event_type == ScreenEventType::ScoreUpdate));
+        assert!(
+            !evs.iter()
+                .any(|e| e.event_type == ScreenEventType::ScoreUpdate)
+        );
     }
 
     // handle_inbound: ulti (L2/R2)
@@ -187,9 +199,10 @@ mod tests {
         let charge_max = engine.character.stats().charge_profile.charge_max;
         engine.state.ultimate_charge = charge_max;
         let evs = engine.handle_inbound(&btn(ButtonId::L2, 1));
-        assert!(evs
-            .iter()
-            .any(|e| e.event_type == ScreenEventType::UltimateTriggered));
+        assert!(
+            evs.iter()
+                .any(|e| e.event_type == ScreenEventType::UltimateTriggered)
+        );
     }
 
     #[test]
@@ -198,9 +211,10 @@ mod tests {
         let charge_max = engine.character.stats().charge_profile.charge_max;
         engine.state.ultimate_charge = charge_max;
         let evs = engine.handle_inbound(&btn(ButtonId::R2, 1));
-        assert!(evs
-            .iter()
-            .any(|e| e.event_type == ScreenEventType::UltimateTriggered));
+        assert!(
+            evs.iter()
+                .any(|e| e.event_type == ScreenEventType::UltimateTriggered)
+        );
     }
 
     #[test]
@@ -218,9 +232,10 @@ mod tests {
         engine.state.ultimate_charge = charge_max;
         // state=0 → release, should be ignored
         let evs = engine.handle_inbound(&btn(ButtonId::L2, 0));
-        assert!(!evs
-            .iter()
-            .any(|e| e.event_type == ScreenEventType::UltimateTriggered));
+        assert!(
+            !evs.iter()
+                .any(|e| e.event_type == ScreenEventType::UltimateTriggered)
+        );
     }
 
     // handle_inbound: plunger
@@ -229,9 +244,10 @@ mod tests {
     fn plunger_held_emits_plunger_charge_during_game() {
         let mut engine = started();
         let evs = engine.handle_inbound(&btn(ButtonId::UnderPlunger, 1));
-        assert!(evs
-            .iter()
-            .any(|e| e.event_type == ScreenEventType::PlungerCharge));
+        assert!(
+            evs.iter()
+                .any(|e| e.event_type == ScreenEventType::PlungerCharge)
+        );
     }
 
     #[test]
@@ -239,9 +255,10 @@ mod tests {
         let mut engine = started();
         // state=0 → release fires BallLaunched (no-op in process, but the inbound path runs)
         let evs = engine.handle_inbound(&btn(ButtonId::UnderPlunger, 0));
-        assert!(evs
-            .iter()
-            .any(|e| e.event_type == ScreenEventType::PlungerCharge));
+        assert!(
+            evs.iter()
+                .any(|e| e.event_type == ScreenEventType::PlungerCharge)
+        );
     }
 
     #[test]
@@ -263,7 +280,10 @@ mod tests {
             tilt: true,
         });
         let evs = engine.handle_inbound(&msg);
-        assert!(evs.iter().any(|e| e.event_type == ScreenEventType::TiltPenalty));
+        assert!(
+            evs.iter()
+                .any(|e| e.event_type == ScreenEventType::TiltPenalty)
+        );
     }
 
     #[test]
@@ -352,9 +372,10 @@ mod tests {
         let charge_max = engine.character.stats().charge_profile.charge_max;
         engine.state.ultimate_charge = charge_max;
         let evs = engine.handle_screen_event(&screen_ev(ScreenEventType::CapacityL2));
-        assert!(evs
-            .iter()
-            .any(|e| e.event_type == ScreenEventType::UltimateTriggered));
+        assert!(
+            evs.iter()
+                .any(|e| e.event_type == ScreenEventType::UltimateTriggered)
+        );
     }
 
     #[test]

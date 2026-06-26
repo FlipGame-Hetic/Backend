@@ -330,7 +330,10 @@ mod tests {
     fn end_game_emits_game_over_event() {
         let mut engine = started("enforcer");
         let evs = engine.process(GameEvent::EndGame);
-        assert!(evs.iter().any(|e| e.event_type == ScreenEventType::GameOver));
+        assert!(
+            evs.iter()
+                .any(|e| e.event_type == ScreenEventType::GameOver)
+        );
     }
 
     // BallLaunched / BallSaved
@@ -366,7 +369,10 @@ mod tests {
         let mut engine = started("enforcer");
         // default 3 lives → losing one leaves 2
         let evs = engine.process(GameEvent::BallLost);
-        assert!(evs.iter().any(|e| e.event_type == ScreenEventType::LifeUpdate));
+        assert!(
+            evs.iter()
+                .any(|e| e.event_type == ScreenEventType::LifeUpdate)
+        );
     }
 
     #[test]
@@ -382,7 +388,10 @@ mod tests {
         engine.state.lives = 1;
         let evs = engine.process(GameEvent::BallLost);
         assert_eq!(engine.state.phase, GamePhase::GameOver);
-        assert!(evs.iter().any(|e| e.event_type == ScreenEventType::GameOver));
+        assert!(
+            evs.iter()
+                .any(|e| e.event_type == ScreenEventType::GameOver)
+        );
     }
 
     #[test]
@@ -401,7 +410,10 @@ mod tests {
         let mut engine = started("enforcer");
         engine.state.score = 10_000;
         let evs = engine.process(GameEvent::TiltDetected);
-        assert!(evs.iter().any(|e| e.event_type == ScreenEventType::TiltPenalty));
+        assert!(
+            evs.iter()
+                .any(|e| e.event_type == ScreenEventType::TiltPenalty)
+        );
         assert!(engine.state.score < 10_000);
     }
 
@@ -412,10 +424,7 @@ mod tests {
         engine.process(GameEvent::TiltDetected);
         engine.process(GameEvent::TiltDetected);
         assert!(engine.state.cheating_detected);
-        let evs = engine
-            .state
-            .tilt_state
-            .count;
+        let evs = engine.state.tilt_state.count;
         assert_eq!(evs, 3);
     }
 
@@ -425,9 +434,10 @@ mod tests {
         engine.process(GameEvent::TiltDetected);
         engine.process(GameEvent::TiltDetected);
         let evs = engine.process(GameEvent::TiltDetected);
-        assert!(evs
-            .iter()
-            .any(|e| e.event_type == ScreenEventType::CheatingDetected));
+        assert!(
+            evs.iter()
+                .any(|e| e.event_type == ScreenEventType::CheatingDetected)
+        );
     }
 
     // LifeUp
@@ -444,7 +454,10 @@ mod tests {
     fn life_up_emits_life_update() {
         let mut engine = started("enforcer");
         let evs = engine.process(GameEvent::LifeUp);
-        assert!(evs.iter().any(|e| e.event_type == ScreenEventType::LifeUpdate));
+        assert!(
+            evs.iter()
+                .any(|e| e.event_type == ScreenEventType::LifeUpdate)
+        );
     }
 
     // MultiballTriggered / MultiballWin
@@ -455,7 +468,10 @@ mod tests {
         let before = engine.state.score;
         let evs = engine.process(GameEvent::MultiballTriggered);
         assert!(engine.state.score > before);
-        assert!(evs.iter().any(|e| e.event_type == ScreenEventType::MultiballWin));
+        assert!(
+            evs.iter()
+                .any(|e| e.event_type == ScreenEventType::MultiballWin)
+        );
     }
 
     #[test]
@@ -469,8 +485,14 @@ mod tests {
     fn multiball_win_emits_score_delta_and_update() {
         let mut engine = started("enforcer");
         let evs = engine.process(GameEvent::MultiballWin);
-        assert!(evs.iter().any(|e| e.event_type == ScreenEventType::ScoreDelta));
-        assert!(evs.iter().any(|e| e.event_type == ScreenEventType::ScoreUpdate));
+        assert!(
+            evs.iter()
+                .any(|e| e.event_type == ScreenEventType::ScoreDelta)
+        );
+        assert!(
+            evs.iter()
+                .any(|e| e.event_type == ScreenEventType::ScoreUpdate)
+        );
     }
 
     // PortalUsed
@@ -481,8 +503,14 @@ mod tests {
         let before = engine.state.score;
         let evs = engine.process(GameEvent::PortalUsed { ball_id: None });
         assert!(engine.state.score > before);
-        assert!(evs.iter().any(|e| e.event_type == ScreenEventType::ScoreDelta));
-        assert!(evs.iter().any(|e| e.event_type == ScreenEventType::ScoreUpdate));
+        assert!(
+            evs.iter()
+                .any(|e| e.event_type == ScreenEventType::ScoreDelta)
+        );
+        assert!(
+            evs.iter()
+                .any(|e| e.event_type == ScreenEventType::ScoreUpdate)
+        );
     }
 
     #[test]
@@ -512,7 +540,10 @@ mod tests {
     fn ball_saver_ready_emits_ball_saver_event() {
         let mut engine = started("enforcer");
         let evs = engine.process(GameEvent::BallSaverReady);
-        assert!(evs.iter().any(|e| e.event_type == ScreenEventType::BallSaverReady));
+        assert!(
+            evs.iter()
+                .any(|e| e.event_type == ScreenEventType::BallSaverReady)
+        );
     }
 
     #[test]
@@ -532,8 +563,14 @@ mod tests {
             e.process(event);
             e.state.score - before
         };
-        let regular = score_for(GameEvent::BumperHit { pts: 100, ball_id: None });
-        let triangle = score_for(GameEvent::BumperTriangleHit { pts: 150, ball_id: None });
+        let regular = score_for(GameEvent::BumperHit {
+            pts: 100,
+            ball_id: None,
+        });
+        let triangle = score_for(GameEvent::BumperTriangleHit {
+            pts: 150,
+            ball_id: None,
+        });
         assert!(triangle > regular);
     }
 
@@ -567,9 +604,10 @@ mod tests {
     fn score_multiplier_activated_emits_multiplier_update() {
         let mut engine = started("enforcer");
         let evs = engine.process(GameEvent::ScoreMultiplierActivated);
-        assert!(evs
-            .iter()
-            .any(|e| e.event_type == ScreenEventType::MultiplierUpdate));
+        assert!(
+            evs.iter()
+                .any(|e| e.event_type == ScreenEventType::MultiplierUpdate)
+        );
     }
 
     // UltimateActivated (legacy no-op)
@@ -607,9 +645,10 @@ mod tests {
             bonus_pts: 500,
             sequence: vec![],
         }));
-        assert!(evs
-            .iter()
-            .any(|e| e.event_type == ScreenEventType::ComboActivated));
+        assert!(
+            evs.iter()
+                .any(|e| e.event_type == ScreenEventType::ComboActivated)
+        );
     }
 
     #[test]
