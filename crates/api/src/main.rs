@@ -10,6 +10,8 @@ use tracing_subscriber::{EnvFilter, fmt};
 
 #[tokio::main]
 async fn main() {
+    // Escape hatch: running the binary with "generate-admin-token" prints a JWT
+    // and exits immediately, useful for initial deployment setup
     if std::env::args().any(|a| a == "generate-admin-token") {
         let secret = std::env::var("SCREEN_JWT_SECRET")
             .unwrap_or_else(|_| "flipper-dev-secret-change-in-prod".to_owned());
@@ -29,7 +31,7 @@ async fn main() {
     };
 
     let connect_opts = match SqliteConnectOptions::from_str(&config.database_url) {
-        Ok(opts) => opts.create_if_missing(true),
+        Ok(opts) => opts.create_if_missing(true), // auto-create the DB file on first boot
         Err(e) => {
             error!(error = %e, url = %config.database_url, "Invalid database URL");
             std::process::exit(1);
@@ -51,6 +53,8 @@ async fn main() {
 
     info!(url = %config.database_url, "Database ready");
 
+    // Load persisted game config from DB so live-tweaked values survive restarts.
+    // Falls back to compiled defaults if no row exists yet (first boot or DB wipe)
     match AdminService::load_config(&pool).await {
         Some(cfg) => {
             game_logic::engine::config::set(cfg);
@@ -82,6 +86,9 @@ async fn main() {
     }
 }
 
+/// Initialise structured JSON tracing from the `RUST_LOG` environment variable
+///
+/// Defaults to `info` level when `RUST_LOG` is absent or invalid
 fn init_tracing() {
     let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
 

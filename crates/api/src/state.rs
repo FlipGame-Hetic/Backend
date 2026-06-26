@@ -40,6 +40,7 @@ pub struct AppState {
 }
 
 impl AppState {
+    /// Build the initial application state with no active game and no connected devices
     pub fn new(jwt_secret: Vec<u8>, db_pool: sqlx::SqlitePool) -> Self {
         let screen_registry = ScreenRegistry::new();
         let screen_router = ScreenRouter::new(screen_registry.clone());

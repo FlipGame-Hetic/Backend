@@ -51,6 +51,8 @@ fn extract_bearer(parts: &Parts) -> Result<&str, ApiError> {
 fn verify_admin_token(token: &str, secret: &[u8]) -> Result<AdminClaims, ApiError> {
     let key = DecodingKey::from_secret(secret);
     let mut validation = Validation::new(Algorithm::HS256);
+    // Admin tokens have no expiry — they are long-lived operational credentials,
+    // not user-session tokens. Skipping exp validation is intentional
     validation.required_spec_claims.clear();
     validation.validate_exp = false;
 
@@ -64,6 +66,9 @@ fn verify_admin_token(token: &str, secret: &[u8]) -> Result<AdminClaims, ApiErro
     Ok(data.claims)
 }
 
+/// Mint a non-expiring admin JWT signed with `secret`
+///
+/// Called from `main` when the binary is invoked with `generate-admin-token`
 pub fn generate_admin_token(secret: &[u8]) -> String {
     let claims = AdminClaims {
         sub: "admin".to_owned(),

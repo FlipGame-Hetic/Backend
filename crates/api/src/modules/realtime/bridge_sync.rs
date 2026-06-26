@@ -17,6 +17,8 @@ pub fn sync_game_state_to_bridge(
 
     let payload = GameState {
         state: phase,
+        // lives starts at 3 and decrements on drain; ball_number is the inverse
+        // (ball 1 = 3 lives remaining, ball 3 = 1 life remaining)
         ball_number: (3u8.saturating_sub(game_state.lives)) as u32 + 1,
         score: game_state.score,
         player: 1,

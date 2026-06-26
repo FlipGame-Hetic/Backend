@@ -62,6 +62,8 @@ pub async fn patch_config(
     State(state): State<AppState>,
     axum::Json(patch): axum::Json<GameConfigPatch>,
 ) -> Result<impl IntoResponse, ApiError> {
+    // Apply the patch atomically in memory first, then read back the full config to persist.
+    // This guarantees the DB always stores the complete merged state, not just the delta
     game_logic::engine::config::apply_patch(patch);
     let updated = config::get().clone();
     AdminService::save_config(&state.db_pool, &updated).await?;

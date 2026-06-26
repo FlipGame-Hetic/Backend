@@ -36,6 +36,8 @@ async fn handle_bridge(socket: WebSocket, state: AppState) {
     let write_handle = tokio::spawn(write_loop(sink, hub_rx));
     let read_handle = tokio::spawn(read_loop(stream, state.clone()));
 
+    // Either loop ending (read EOF, WS close, send error) should tear down the other.
+    // `select!` cancels the remaining task automatically when one branch completes
     tokio::select! {
         res = read_handle => {
             match res {
@@ -51,6 +53,7 @@ async fn handle_bridge(socket: WebSocket, state: AppState) {
         }
     }
 
+    // Clear the device ID so subsequent game events don't attempt to sync to a dead bridge
     *state.active_device_id.write().await = None;
     info!("bridge websocket disconnected");
 }
@@ -107,6 +110,11 @@ async fn read_loop(mut stream: futures_util::stream::SplitStream<WebSocket>, sta
     }
 }
 
+/// Route an inbound message from the ESP32 bridge to the correct handler
+///
+/// When no game is running, button presses with a mapped `menu_id` are forwarded
+/// to `back_screen` as `MenuButton` events so the UI can navigate menus without
+/// a running game session
 async fn process_inbound(state: &AppState, payload: &shared::events::InboundMessage) {
     if let shared::events::InboundMessage::Button(btn) = payload {
         let game_running = state.game_engine.lock().await.is_some();
@@ -134,6 +142,10 @@ async fn process_inbound(state: &AppState, payload: &shared::events::InboundMess
     }
 }
 
+/// Map physical button IDs to menu action strings understood by the front-end
+///
+/// Only the five main interaction buttons have menu semantics;
+/// sensor-only inputs like gyro or under_plunger return `None`
 fn map_button_to_menu_id(id: &ButtonId) -> Option<&'static str> {
     match id {
         ButtonId::L1 => Some("flipper_left"),
@@ -145,6 +157,10 @@ fn map_button_to_menu_id(id: &ButtonId) -> Option<&'static str> {
     }
 }
 
+/// Relay outbound `WsMessage` frames from the hub broadcast channel to the bridge WebSocket
+///
+/// `Lagged` means the bridge consumer fell behind the broadcast ring buffer (capacity 256);
+/// we skip the missed frames and continue — the ESP32 will reconcile state on the next push
 async fn write_loop(
     mut sink: SplitSink<WebSocket, Message>,
     mut hub_rx: broadcast::Receiver<WsMessage>,

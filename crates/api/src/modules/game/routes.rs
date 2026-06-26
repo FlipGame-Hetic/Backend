@@ -55,6 +55,7 @@ pub async fn game_state(State(state): State<AppState>) -> Result<impl IntoRespon
     };
 
     let snapshot = engine.take_snapshot();
+    // Release the engine lock before acquiring active_session to respect lock order
     drop(engine_guard);
 
     let character = state
@@ -86,70 +87,94 @@ pub async fn end_game(State(state): State<AppState>) -> Result<impl IntoResponse
     ))
 }
 
-/// Returns the gameplay roster (no visual data — the front merges by slug with its own config).
+/// Returns the full character roster with their live game-engine parameters.
+///
+/// Values are read directly from [`game_logic`] structs and the runtime [`GameConfig`],
+/// so they always reflect the current admin configuration — patching the config via
+/// `PATCH /api/v1/admin/config` is immediately visible here without a restart.
+///
+/// Visual assets, display names, and lore copy live in the frontend config; this
+/// endpoint is authoritative only for the fields the game engine actually uses
+/// (ult shape, charge weights, payload scalars, etc.).
 pub async fn get_characters() -> impl IntoResponse {
-    let characters = serde_json::json!([
-        {
-            "id": "enforcer",
-            "ulti_id": "multiball_split",
-            "shape": "instant",
-            "cancellable": false,
-            "charge_max": 320,
-            "charge_profile": {
-                "weight_bumper": 1.0,
-                "weight_rail": 0.3,
-                "weight_combo": 1.0,
-                "weight_other": 1.0,
-                "time_rate": 0.0
+    use game_logic::{UltiShape, select_character};
+
+    // Acquire the config read-guard once for the whole iterator instead of once per
+    // character — `stats()` also calls `config::get()` internally but releases it
+    // immediately; holding this guard concurrently is safe because it is a RwLock.
+    let cfg = game_logic::engine::config::get();
+
+    let characters: Vec<serde_json::Value> = ["enforcer", "viper", "ghost", "oracle"]
+        .iter()
+        .map(|&slug| {
+            // `select_character` returns a boxed trait object; it logs a warning and
+            // falls back to Enforcer on unknown slugs, so this list must stay in sync
+            // with the match arms in `game_logic::player::personnages::character`.
+            let c = select_character(slug);
+
+            // `stats()` reads the live config internally, so charge_max and all weights
+            // already reflect any patch applied since the process started.
+            let profile = c.stats().charge_profile;
+
+            // Start with the fields that are common across all characters, then
+            // add shape-specific and character-specific keys below.
+            let mut obj = serde_json::json!({
+                "id": c.slug(),
+                "ulti_id": c.ulti_id(),
+                "charge_max": profile.charge_max,
+                "charge_profile": {
+                    "weight_bumper": profile.weight_bumper,
+                    "weight_rail":   profile.weight_rail,
+                    "weight_combo":  profile.weight_combo,
+                    "weight_other":  profile.weight_other,
+                    // Non-zero only for Oracle: passive charge that ticks up over time
+                    // regardless of ball events.
+                    "time_rate": profile.time_rate,
+                }
+            });
+
+            // `UltiShape` drives how the frontend arms and fires the ultimate:
+            //   - Instant    fires immediately, no hold logic needed on the client side.
+            //   - Sustained  runs for `duration_ms` and may be cancelled mid-flight.
+            //   - Inherited  takes the shape of the current game cycle; the client must
+            //                resolve the concrete shape at activation time.
+            match c.ulti_shape() {
+                UltiShape::Instant => {
+                    obj["shape"] = serde_json::json!("instant");
+                    obj["cancellable"] = serde_json::json!(false);
+                }
+                UltiShape::Sustained { duration_ms, cancellable } => {
+                    obj["shape"] = serde_json::json!("sustained");
+                    obj["cancellable"] = serde_json::json!(cancellable);
+                    obj["duration_ms"] = serde_json::json!(duration_ms);
+                }
+                // Ghost: no `cancellable` or `duration_ms` — the client reads the active
+                // cycle's shape when the ult actually triggers.
+                UltiShape::Inherited => {
+                    obj["shape"] = serde_json::json!("inherited");
+                }
             }
-        },
-        {
-            "id": "viper",
-            "ulti_id": "rampage",
-            "shape": "sustained",
-            "cancellable": false,
-            "duration_ms": 8000,
-            "charge_max": 360,
-            "payload": { "multiplier": 5.0 },
-            "charge_profile": {
-                "weight_bumper": 1.0,
-                "weight_rail": 1.0,
-                "weight_combo": 1.0,
-                "weight_other": 1.0,
-                "time_rate": 0.0
+
+            // `payload` carries ult-specific scalars that the frontend uses for its own
+            // animations or HUD display. Only characters whose ult has a tunable scalar
+            // expose this field; others omit it entirely to keep the contract minimal.
+            match slug {
+                "viper" => {
+                    // Score multiplier applied to all events during the Rampage window.
+                    obj["payload"] = serde_json::json!({ "multiplier": cfg.viper_rampage_multiplier });
+                }
+                "oracle" => {
+                    // Fraction of normal speed (0 < slow_factor < 1) during Time Slow.
+                    obj["payload"] = serde_json::json!({ "slow_factor": cfg.oracle_slow_factor });
+                }
+                _ => {}
             }
-        },
-        {
-            "id": "ghost",
-            "ulti_id": "mimic",
-            "shape": "inherited",
-            "charge_max": 300,
-            "charge_profile": {
-                "weight_bumper": 1.0,
-                "weight_rail": 1.0,
-                "weight_combo": 1.0,
-                "weight_other": 1.0,
-                "time_rate": 0.0
-            }
-        },
-        {
-            "id": "oracle",
-            "ulti_id": "time_slow",
-            "shape": "sustained",
-            "cancellable": true,
-            "duration_ms": 5000,
-            "charge_max": 240,
-            "payload": { "slow_factor": 0.25 },
-            "charge_profile": {
-                "weight_bumper": 1.0,
-                "weight_rail": 1.0,
-                "weight_combo": 1.0,
-                "weight_other": 1.0,
-                "time_rate": 1.0
-            }
-        }
-    ]);
-    (StatusCode::OK, axum::Json(characters))
+
+            obj
+        })
+        .collect();
+
+    (StatusCode::OK, axum::Json(serde_json::Value::Array(characters)))
 }
 
 #[cfg(test)]
