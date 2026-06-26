@@ -18,8 +18,8 @@ impl GameEngine {
         } else {
             self.state.ultimate_charge
         };
-        let ulti_ready =
-            !self.state.is_ulti_active(now) && self.state.ultimate_charge >= self.activation_min_charge();
+        let ulti_ready = !self.state.is_ulti_active(now)
+            && self.state.ultimate_charge >= self.activation_min_charge();
 
         let mut payload = serde_json::json!({
             "score": self.state.score,

@@ -279,7 +279,10 @@ mod tests {
             .iter()
             .find(|e| e.event_type == ScreenEventType::UltimateTriggered)
             .expect("should trigger at full charge");
-        assert_eq!(triggered.payload["duration_ms"].as_u64().unwrap(), full_duration);
+        assert_eq!(
+            triggered.payload["duration_ms"].as_u64().unwrap(),
+            full_duration
+        );
     }
 
     #[test]
@@ -301,7 +304,10 @@ mod tests {
             .expect("should emit UltimateStopped");
         let residual = stopped.payload["ultimate_charge"].as_u64().unwrap() as u32;
 
-        assert!(residual <= start_charge, "residual must not exceed start charge");
+        assert!(
+            residual <= start_charge,
+            "residual must not exceed start charge"
+        );
         assert!(
             residual >= start_charge * 9 / 10,
             "residual {residual} should be ≥90% of start_charge {start_charge} on immediate cancel"
@@ -359,7 +365,10 @@ mod tests {
             .find(|e| e.event_type == ScreenEventType::UltimateTriggered)
             .expect("should trigger");
         assert_eq!(triggered.payload["ulti_id"], serde_json::json!("time_slow"));
-        assert_eq!(engine.state.ghost_cycle_index, 3, "cycle must advance after acceptance");
+        assert_eq!(
+            engine.state.ghost_cycle_index, 3,
+            "cycle must advance after acceptance"
+        );
     }
 
     #[test]

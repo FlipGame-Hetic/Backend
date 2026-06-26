@@ -18,8 +18,7 @@ impl GameEngine {
             return;
         }
         let delta_s = config::get().pve_tick_interval_ms as f32 / 1000.0;
-        let (gain, new_buffer) =
-            time_to_charge(time_rate, delta_s, self.state.time_charge_buffer);
+        let (gain, new_buffer) = time_to_charge(time_rate, delta_s, self.state.time_charge_buffer);
         self.state.time_charge_buffer = new_buffer;
         if gain > 0 {
             let charge_max = stats.charge_profile.charge_max;
