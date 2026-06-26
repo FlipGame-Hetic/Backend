@@ -1,3 +1,8 @@
+//! Entry point for the `mqtt-bridge` binary.
+//!
+//! Reads configuration from environment variables, initialises structured
+//! JSON tracing, then delegates to [`Bridge`] which runs the MQTT ↔ WebSocket
+//! relay loop indefinitely.
 use tracing::{error, info};
 use tracing_subscriber::{EnvFilter, fmt};
 
@@ -30,9 +35,15 @@ async fn main() {
     );
 
     let bridge = Bridge::new(config);
+    // `run` never returns — it reconnects indefinitely on failure
     bridge.run().await;
 }
 
+/// Initialise the global tracing subscriber.
+///
+/// Reads the log level from `RUST_LOG`; falls back to `info` if unset or
+/// invalid.  JSON output is intentional: log aggregators (Loki, Datadog, etc.)
+/// parse structured fields far more reliably than free-form text lines.
 fn init_tracing() {
     let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
 
