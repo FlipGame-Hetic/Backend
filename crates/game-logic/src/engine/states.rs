@@ -74,6 +74,8 @@ pub struct GameState {
     pub ulti_duration_ms: u64,
     pub ulti_cancellable: bool,
     pub ulti_active_id: Option<String>,
+    /// Charge committed at activation — used to compute residual on cancel/display.
+    pub ulti_start_charge: u32,
     /// Overrides `effective_multiplier` to a fixed value while ulti is active (Viper rampage).
     pub ulti_multiplier_override: Option<f32>,
 
@@ -103,6 +105,7 @@ impl GameState {
             ulti_duration_ms: 0,
             ulti_cancellable: false,
             ulti_active_id: None,
+            ulti_start_charge: 0,
             ulti_multiplier_override: None,
             ghost_cycle_index: 0,
         }
@@ -126,28 +129,21 @@ impl GameState {
         self.ulti_ends_at.map(|t| now < t).unwrap_or(false)
     }
 
+    /// Compute remaining charge during a sustained ulti (linear drain from `ulti_start_charge`).
+    /// Used both to display the charge bar and to restore partial charge on cancel.
     pub fn residual_charge(&self, now: Instant) -> u32 {
         let Some(ends_at) = self.ulti_ends_at else {
             return 0;
         };
-        if now >= ends_at || self.ulti_duration_ms == 0 {
-            return 0;
-        }
-        // charge_max is not stored here use residual_charge_with_max instead.
-        0
-    }
-
-    /// Compute how much ultimate charge remains during a sustained ulti (linear drain).
-    /// Used to display the charge bar and to restore partial charge on cancel.
-    pub fn residual_charge_with_max(&self, now: Instant, charge_max: u32) -> u32 {
-        let Some(ends_at) = self.ulti_ends_at else {
-            return 0;
-        };
-        if now >= ends_at || self.ulti_duration_ms == 0 {
+        if now >= ends_at {
             return 0;
         }
         let remaining_ms = ends_at.duration_since(now).as_millis() as u64;
-        ((charge_max as u64 * remaining_ms) / self.ulti_duration_ms) as u32
+        crate::engine::services::ulti::residual_charge(
+            self.ulti_start_charge,
+            remaining_ms,
+            self.ulti_duration_ms,
+        )
     }
 }
 

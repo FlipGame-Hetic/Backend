@@ -56,6 +56,7 @@ pub struct GameConfigPatch {
     pub oracle_ulti_duration_ms: Option<u64>,
     pub oracle_slow_factor: Option<f32>,
     pub oracle_time_rate: Option<f32>,
+    pub oracle_activation_min_ratio: Option<f32>,
     pub streak_window_ms: Option<u64>,
     pub streak_tier_1_count: Option<u32>,
     pub streak_tier_2_count: Option<u32>,
@@ -150,6 +151,8 @@ pub struct GameConfig {
     pub oracle_ulti_duration_ms: u64,
     pub oracle_slow_factor: f32,
     pub oracle_time_rate: f32,
+    /// Fraction of charge_max below which time_slow cannot be activated (default 5%).
+    pub oracle_activation_min_ratio: f32,
 
     // Streak multiplier
     pub streak_window_ms: u64,
@@ -230,6 +233,7 @@ impl Default for GameConfig {
             oracle_ulti_duration_ms: 5_000,
             oracle_slow_factor: 0.25,
             oracle_time_rate: 1.0,
+            oracle_activation_min_ratio: 0.05,
             streak_window_ms: 2_000,
             streak_tier_1_count: 2,
             streak_tier_2_count: 5,
@@ -322,6 +326,7 @@ pub fn apply_patch(patch: GameConfigPatch) {
     apply!(oracle_ulti_duration_ms);
     apply!(oracle_slow_factor);
     apply!(oracle_time_rate);
+    apply!(oracle_activation_min_ratio);
     apply!(streak_window_ms);
     apply!(streak_tier_1_count);
     apply!(streak_tier_2_count);
