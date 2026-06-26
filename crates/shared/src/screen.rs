@@ -1,17 +1,29 @@
+//! Types for the WebSocket protocol between frontend screens and the backend.
+//!
+//! The three physical screens (front, back, DMD) each connect over WebSocket.
+//! They exchange [`ScreenEnvelope`] messages that carry a typed
+//! [`ScreenEventType`] and a free-form JSON payload.
 use std::fmt;
 use std::str::FromStr;
 
 use schemars::JsonSchema;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
-/// Fixed set of known frontend screens.
+
+/// Identifies one of the screens connected to the backend.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ScreenId {
+    /// The main front-facing player display.
     FrontScreen,
+    /// The screen on the back of the cabinet.
     BackScreen,
+    /// The dot-matrix display (DMD) at the top of the playfield.
     DmdScreen,
-    /// Virtual sender for game-logic events. Never registered as a real screen,
-    /// so broadcasts from this id are delivered to all connected screens without exclusion.
+    /// Virtual sender used by the game engine.
+    ///
+    /// Never registered as a real WebSocket connection — it exists only as a
+    /// `from` identifier so broadcasts from the game engine reach **all**
+    /// connected screens without any exclusion.
     GameEngine,
 }
 
@@ -25,7 +37,10 @@ impl ScreenId {
         }
     }
 
-    /// Returns all known screen variants (useful for iteration / validation).
+    /// Returns every screen that can physically connect.
+    ///
+    /// `GameEngine` is intentionally excluded — it is a virtual sender and
+    /// never has a real WebSocket session.
     pub fn all() -> &'static [ScreenId] {
         &[Self::FrontScreen, Self::BackScreen, Self::DmdScreen]
     }
@@ -37,6 +52,7 @@ impl fmt::Display for ScreenId {
     }
 }
 
+/// Returned when a string cannot be parsed into a [`ScreenId`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ParseScreenIdError(String);
 
@@ -51,6 +67,9 @@ impl std::error::Error for ParseScreenIdError {}
 impl FromStr for ScreenId {
     type Err = ParseScreenIdError;
 
+    /// Accepts both snake_case (`"front_screen"`) and kebab-case
+    /// (`"front-screen"`) so the type can be used in URL path segments without
+    /// a separate conversion step.
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "front_screen" | "front-screen" => Ok(Self::FrontScreen),
@@ -62,21 +81,32 @@ impl FromStr for ScreenId {
     }
 }
 
-/// Routing target for a screen message.
+/// Who should receive a screen message.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case", tag = "kind")]
 pub enum ScreenTarget {
-    /// Send to a single specific screen.
+    /// Deliver to one specific screen.
     Screen { id: ScreenId },
-    /// Send to all screens except the sender.
+    /// Deliver to every screen except the sender.
     Broadcast,
 }
 
-/// Typed set of events that transit over the screen WebSocket channel.
+/// All event types that can appear in a [`ScreenEnvelope`].
 ///
-/// All events produced by the game engine or sent by frontend screens are
-/// members of this enum. The `Unknown` variant acts as a catch-all so that
-/// unknown wire values deserialise gracefully instead of failing.
+/// Split into two groups:
+/// - **Inbound** Sent by a screen to the game engine (physical interactions).
+/// - **Outbound** Sent by the game engine to screens (game state changes).
+///
+/// The `Unknown` catch-all lets the system forward unrecognised event strings
+/// without crashing, which is useful during development and for custom events
+/// in tests.
+///
+/// ## Why manual Serialize / Deserialize?
+///
+/// Deriving would produce `{"Unknown": "foo"}` for the `Unknown` variant.
+/// Instead we want the wire format to be a plain string in both directions
+/// (e.g. `"BossDefeated"` or `"my_custom_event"`), so the impls below
+/// serialise via [`as_str`][Self::as_str] and deserialise via [`From<String>`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ScreenEventType {
     // Inbound: sent by a screen to the game engine
@@ -130,7 +160,7 @@ pub enum ScreenEventType {
     MenuButton,
     UltimateTriggered,
     UltimateStopped,
-    /// Extension / test events that are not part of the known protocol.
+    /// Any event string not listed above — passes through without error.
     Unknown(String),
 }
 
@@ -281,12 +311,17 @@ impl schemars::JsonSchema for ScreenEventType {
     }
 }
 
-/// Envelope for messages transiting between frontend screens via the backend.
+/// A message travelling between frontend screens via the backend WebSocket.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct ScreenEnvelope {
+    /// Which screen sent this message.
     pub from: ScreenId,
+    /// Delivery target: a specific screen or all screens.
     pub to: ScreenTarget,
+    /// What kind of event this is.
     pub event_type: ScreenEventType,
+    /// Event-specific data.  Structure depends on `event_type`; left untyped
+    /// so screens can evolve their payloads independently.
     pub payload: serde_json::Value,
 }
 

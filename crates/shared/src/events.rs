@@ -1,59 +1,99 @@
+//! Message payloads exchanged between the ESP32 devices, the MQTT bridge, and
+//! the central API.
+//!
+//! Data flows in two directions:
+//! - **Inbound** (ESP32 → server): physical inputs and diagnostics.
+//! - **Outbound** (server → ESP32): game state updates and commands.
+//!
+//! [`WsMessage`] is the outer envelope used on the WebSocket between the bridge
+//! and the API.  It tags the direction with a `"dir"` field and nests the
+//! typed payload inside a `"payload"` object.
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::model::{ButtonId, CommandKind, EventKind, GamePhase, HitType};
 
-// ESP32 => Server
+// ── ESP32 → Server ────────────────────────────────────────────────────────────
 
+/// A physical button was pressed or released.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct ButtonInput {
+    /// Which button fired.
     pub id: ButtonId,
+    /// `1` = pressed, `0` = released.
     pub state: u8,
+    /// Milliseconds since device boot.
     pub ts: u64,
 }
 
+/// The plunger position changed.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct PlungerInput {
+    /// `1` = pulled back, `0` = released.
     pub state: u8,
+    /// Milliseconds since device boot.
     pub ts: u64,
 }
 
+/// Raw accelerometer reading from the gyroscope sensor.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct GyroInput {
+    /// Acceleration on the X axis (m/s²).
     pub ax: f32,
+    /// Acceleration on the Y axis (m/s²).
     pub ay: f32,
+    /// Acceleration on the Z axis (m/s²).
     pub az: f32,
+    /// `true` when the combined acceleration exceeds the tilt threshold.
     pub tilt: bool,
 }
 
+/// Periodic health report from the ESP32.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct Telemetry {
+    /// Wi-Fi signal strength in dBm (negative; closer to 0 is better).
     pub wifi_rssi: i32,
+    /// Seconds since the device last booted.
     pub uptime_s: u64,
+    /// Main loop frequency in Hz (used to detect performance degradation).
     pub loop_freq_hz: u32,
+    /// Free heap memory in bytes.
     pub free_heap: u32,
+    /// Number of MQTT reconnections since boot.
     pub mqtt_reconnects: u32,
 }
 
+/// A lifecycle event sent by the firmware (boot, OTA, error, etc.).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct DeviceEvent {
+    /// What happened.
     pub event: EventKind,
+    /// Firmware version string at the time of the event.
     pub fw_version: String,
+    /// Human-readable reason or detail (e.g. `"power_on"`, `"watchdog"`).
     pub reason: String,
+    /// Milliseconds since device boot.
     pub ts: u64,
 }
 
+/// Device presence and health snapshot, sent on connect and when status changes.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct DeviceStatus {
+    /// `true` if the device is currently connected and responsive.
     pub online: bool,
+    /// Running firmware version.
     pub fw_version: String,
+    /// Current IP address on the local network.
     pub ip: String,
+    /// Free heap memory in bytes.
     pub free_heap: u32,
+    /// One entry per vibration motor — `true` means the motor self-test passed.
     pub vibrators_ok: Vec<bool>,
+    /// `true` if the gyroscope self-test passed.
     pub gyro_ok: bool,
 }
 
-// Frontend Screen => Backend
+// ── Frontend Screen → Backend ─────────────────────────────────────────────────
 
 /// Sent by a frontend screen when a physical bumper is hit.
 ///
@@ -64,21 +104,28 @@ pub struct BumperHit {
     pub bumper_id: u8,
 }
 
-// Server => ESP32
+// ── Server → ESP32 ────────────────────────────────────────────────────────────
 
+/// Describes a single collision the server wants the ESP32 to react to.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct Hit {
+    /// Identifier of the object that was hit (e.g. `"bumper-1"`).
     pub id: String,
+    /// What kind of object it is (bumper, rail, target…).
     #[serde(rename = "type")]
     pub hit_type: HitType,
+    /// Normalised impact force in the range `[0.0, 1.0]`.
     pub force: f32,
 }
 
+/// Batch of collision events for one game tick, sent to the ESP32 to trigger
+/// vibrations or visual feedback.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct BallHit {
     pub hits: Vec<Hit>,
 }
 
+/// Current game state pushed to the ESP32 so its displays stay in sync.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct GameState {
     pub state: GamePhase,
@@ -88,14 +135,24 @@ pub struct GameState {
     pub total_players: u32,
 }
 
+/// A generic command with a free-form `params` payload.
+///
+/// `params` is an untyped JSON value so new command parameters can be added
+/// without changing this struct.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct Command {
     pub cmd: CommandKind,
     pub params: serde_json::Value,
 }
 
-// Unified envelope for all inbound messages
+// ── Unified envelopes ─────────────────────────────────────────────────────────
 
+/// All messages that can travel from an ESP32 to the server.
+///
+/// The `_type` tag in JSON identifies the variant, so the receiver knows which
+/// struct to deserialise into without inspecting the payload fields.
+///
+/// Example wire form: `{"_type":"Button","id":"L1","state":1,"ts":84200}`
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(tag = "_type")]
 pub enum InboundMessage {
@@ -107,14 +164,40 @@ pub enum InboundMessage {
     Status(DeviceStatus),
 }
 
-// Unified envelope for all outbound messages
-
+/// All messages that can travel from the server to an ESP32.
+///
+/// Same `_type` tagging strategy as [`InboundMessage`].
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(tag = "_type")]
 pub enum OutboundMessage {
     BallHit(BallHit),
     GameState(GameState),
     Command(Command),
+}
+
+/// Outer envelope for all messages on the WebSocket between the bridge and the API.
+///
+/// `"dir"` in the JSON distinguishes the two directions so a single WebSocket
+/// connection can carry traffic both ways:
+/// - `"inbound"` → bridge forwarding an ESP32 event to the API
+/// - `"outbound"` → API sending a command back to a device via the bridge
+///
+/// The payload is **nested** (not flattened) to avoid a serde bug (serde#1183)
+/// that silently breaks deserialisation when two internally-tagged enums are
+/// combined with `#[serde(flatten)]`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(tag = "dir", rename_all = "snake_case")]
+pub enum WsMessage {
+    /// Bridge → API: an inbound event from a device.
+    Inbound {
+        device_id: String,
+        payload: InboundMessage,
+    },
+    /// API → Bridge: an outbound command targeting a device.
+    Outbound {
+        device_id: String,
+        payload: OutboundMessage,
+    },
 }
 
 #[cfg(test)]
@@ -159,9 +242,9 @@ mod tests {
     // every variant must survive a serialize -> assert exact JSON ->
     // deserialize -> assert equality roundtrip.
 
-    /// Asserts that `msg` serializes to exactly `expected_json`, that the
-    /// `dir` and `_type` discriminants are present, and that the JSON
-    /// deserializes back to a value equal to `msg`.
+    /// Assert that `msg` serialises to exactly `expected_json`, that both
+    /// `"dir"` and `"_type"` discriminants are present, that `"payload"` is
+    /// nested (not flattened), and that the JSON round-trips back to `msg`.
     fn assert_ws_roundtrip(msg: &WsMessage, expected_json: &str) {
         let json = serde_json::to_string(msg).unwrap();
         assert_eq!(json, expected_json, "serialized JSON mismatch");
@@ -350,25 +433,4 @@ mod tests {
         let legacy = r#"{"dir":"inbound","device_id":"abc","_type":"Button","id":"flipper_left","state":1,"ts":123}"#;
         assert!(serde_json::from_str::<WsMessage>(legacy).is_err());
     }
-}
-
-// WebSocket envelope (Bridge ↔ API)
-
-// Every message transiting over the WebSocket between a borne's bridge
-// and the central API is wrapped in this envelope so the API knows
-// which device it comes from / should be routed to.
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
-#[serde(tag = "dir", rename_all = "snake_case")]
-pub enum WsMessage {
-    /// Bridge => API: an inbound event from a device.
-    Inbound {
-        device_id: String,
-        payload: InboundMessage,
-    },
-    /// API => Bridge: an outbound command targeting a device.
-    Outbound {
-        device_id: String,
-        payload: OutboundMessage,
-    },
 }
