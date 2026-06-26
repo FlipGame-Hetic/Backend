@@ -14,12 +14,12 @@ impl GameEngine {
         let charge_max = self.character.stats().charge_profile.charge_max;
 
         let displayed_charge = if self.state.is_ulti_active(now) {
-            self.state.residual_charge_with_max(now, charge_max)
+            self.state.residual_charge(now)
         } else {
             self.state.ultimate_charge
         };
         let ulti_ready =
-            !self.state.is_ulti_active(now) && self.state.ultimate_charge >= charge_max;
+            !self.state.is_ulti_active(now) && self.state.ultimate_charge >= self.activation_min_charge();
 
         let mut payload = serde_json::json!({
             "score": self.state.score,
