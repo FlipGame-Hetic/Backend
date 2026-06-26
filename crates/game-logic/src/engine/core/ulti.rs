@@ -5,7 +5,7 @@ use shared::screen::{ScreenEnvelope, ScreenEventType};
 use crate::engine::config;
 use crate::player::personnages::character::UltiShape;
 
-use super::{GameEngine, GHOST_CYCLE, make_event_envelope};
+use super::{GHOST_CYCLE, GameEngine, make_event_envelope};
 
 impl GameEngine {
     /// Expire a sustained ulti that has run its full duration.

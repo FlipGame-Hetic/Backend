@@ -4,7 +4,7 @@ use shared::screen::{ScreenEnvelope, ScreenEventType};
 
 use crate::combo::ComboEffect;
 
-use super::{GameEngine, GHOST_CYCLE, make_event_envelope};
+use super::{GHOST_CYCLE, GameEngine, make_event_envelope};
 
 impl GameEngine {
     pub(super) fn emit_score_update(&self, ball_id: Option<String>) -> ScreenEnvelope {
