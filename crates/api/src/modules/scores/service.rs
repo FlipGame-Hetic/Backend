@@ -2,6 +2,7 @@ use sqlx::{Row, SqlitePool};
 
 use super::dto::{SaveScoreRequest, ScoreEntry};
 
+// Hard cap on leaderboard size enforced at write time, never exceeded in the DB
 const LEADERBOARD_LIMIT: i64 = 10;
 
 /// Attempts to insert `req` into the top-10 leaderboard.
@@ -48,6 +49,7 @@ pub async fn save_score(pool: &SqlitePool, req: SaveScoreRequest) -> Result<bool
     Ok(true)
 }
 
+/// Fetch the top-`limit` scores sorted by score descending
 pub async fn get_leaderboard(
     pool: &SqlitePool,
     limit: i64,
@@ -63,6 +65,7 @@ pub async fn get_leaderboard(
     Ok(rows.into_iter().map(row_to_entry).collect())
 }
 
+// Explicit field mapping avoids `FromRow` macro magic that breaks silently on column renames
 fn row_to_entry(row: sqlx::sqlite::SqliteRow) -> ScoreEntry {
     ScoreEntry {
         id: row.get("id"),

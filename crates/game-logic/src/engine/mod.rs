@@ -1,3 +1,5 @@
+//! Game engine central event loop, state machine, scoring, and PVE.
+
 pub mod components;
 pub mod config;
 pub mod core;

@@ -1,3 +1,10 @@
+//! Connection registry for pinball screens.
+//!
+//! [`ScreenRegistry`] tracks which screens are currently connected by holding
+//! the sender half of a per-screen mpsc channel.  Callers receive the receiver
+//! half wrapped in a [`ScreenHandle`] and hold a [`ScreenGuard`] whose `Drop`
+//! impl automatically cleans up the registry entry when the WebSocket session
+//! ends.
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -7,14 +14,16 @@ use tracing::{debug, info, warn};
 
 use crate::error::{Result, ScreenHubError};
 
-/// Capacity for per-screen outbound channels.
+/// Depth of the per-screen outbound channel.  128 messages of headroom before
+/// the sender starts dropping frames for a slow screen.
 const SCREEN_CHANNEL_CAPACITY: usize = 128;
 
-/// Guard that auto-unregisters the screen when dropped.
+/// RAII guard that automatically unregisters a screen when dropped.
 ///
-/// Hold this for the lifetime of the WebSocket connection.
-/// When the connection ends and the guard is dropped, the screen
-/// is automatically removed from the registry.
+/// Hold this for the entire lifetime of the WebSocket connection.  When the
+/// connection closes and the guard falls out of scope, it spawns a one-shot
+/// async task to remove the screen from the registry necessary because `Drop`
+/// is synchronous and cannot `.await` directly.
 pub struct ScreenGuard {
     screen_id: ScreenId,
     registry: Arc<ScreenRegistryInner>,
@@ -25,35 +34,37 @@ impl Drop for ScreenGuard {
         let inner = Arc::clone(&self.registry);
         let id = self.screen_id;
 
-        // Fire-and-forget cleanup. We spawn because Drop is sync.
+        // `Drop` is sync, so we spawn a fire-and-forget task for the async remove.
         tokio::spawn(async move {
             inner.remove(id).await;
         });
     }
 }
 
-/// Handle returned when a screen registers.
+/// Handle returned when a screen successfully registers.
 ///
-/// Use `into_parts()` to split into the receiver (for the write loop)
-/// and the guard (hold it for the connection lifetime).
+/// Split with [`into_parts`][Self::into_parts] to obtain:
+/// - the **receiver** — pass to the WS write loop to forward messages to the screen
+/// - the **guard** — keep alive for the duration of the connection
 pub struct ScreenHandle {
     rx: mpsc::Receiver<ScreenEnvelope>,
     guard: ScreenGuard,
 }
 
 impl ScreenHandle {
-    /// Split into the message receiver and the cleanup guard.
+    /// Decompose into the message receiver and the cleanup guard.
     ///
-    /// The `ScreenGuard` must be held alive for the duration of the connection.
-    /// Dropping it triggers automatic unregistration from the registry.
+    /// The [`ScreenGuard`] **must** remain alive until the connection ends;
+    /// dropping it earlier unregisters the screen prematurely.
     pub fn into_parts(self) -> (mpsc::Receiver<ScreenEnvelope>, ScreenGuard) {
         (self.rx, self.guard)
     }
 }
 
-/// Internal state behind the `Arc`.
+/// Shared mutable state behind the registry's `Arc`.
 #[derive(Default)]
 struct ScreenRegistryInner {
+    /// Maps each connected screen to the sender half of its outbound channel.
     senders: RwLock<HashMap<ScreenId, mpsc::Sender<ScreenEnvelope>>>,
 }
 
@@ -68,12 +79,13 @@ impl ScreenRegistryInner {
 
 /// Thread-safe registry of connected screens.
 ///
-/// Each screen gets an `mpsc` channel when it registers.
-/// The registry holds the `Sender` side; the screen WS handler holds the `Receiver`
-/// via the returned `ScreenHandle`.
+/// Each screen gets a bounded mpsc channel when it registers.  This struct
+/// holds the `Sender` halves; the screen's WS handler holds the `Receiver`
+/// via the [`ScreenHandle`] returned by [`register`][Self::register].
 ///
-/// Routing logic lives in [`crate::router::ScreenRouter`], not here.
-/// This struct is purely about connection lifecycle.
+/// **Separation of concerns**: this struct handles connection lifecycle only.
+/// Routing logic (unicast, broadcast, interceptors) lives in
+/// [`crate::router::ScreenRouter`].
 #[derive(Clone, Default)]
 pub struct ScreenRegistry {
     inner: Arc<ScreenRegistryInner>,
@@ -88,9 +100,10 @@ impl ScreenRegistry {
         }
     }
 
-    /// Register a screen and return a handle that receives messages for it.
+    /// Register a screen and return a handle that delivers inbound messages.
     ///
-    /// Fails if the screen is already connected (no duplicate sessions).
+    /// Fails with [`ScreenHubError::AlreadyConnected`] if a session for this
+    /// screen is already active — callers should close the old connection first.
     pub async fn register(&self, id: ScreenId) -> Result<ScreenHandle> {
         let mut senders = self.inner.senders.write().await;
 
@@ -111,10 +124,12 @@ impl ScreenRegistry {
         Ok(ScreenHandle { rx, guard })
     }
 
-    /// Send an envelope to a specific screen.
+    /// Send an envelope to a specific screen using a non-blocking `try_send`.
     ///
-    /// Returns `Ok(true)` if sent, `Ok(false)` if the screen is not connected,
-    /// or `Err` if the channel is closed (stale entry — cleaned up automatically).
+    /// Returns:
+    /// - `Ok(true)` message delivered to the channel
+    /// - `Ok(false)` screen not connected or channel full (message dropped)
+    /// - `Err(SendFailed)` channel was closed; stale entry removed automatically
     pub async fn send_to(&self, id: ScreenId, envelope: &ScreenEnvelope) -> Result<bool> {
         let senders = self.inner.senders.read().await;
 
@@ -130,15 +145,20 @@ impl ScreenRegistry {
                 Ok(false)
             }
             Err(mpsc::error::TrySendError::Closed(_)) => {
+                // We must release the read lock before calling `remove`, which
+                // acquires a write lock.  Holding both would deadlock.
                 drop(senders);
-                // Stale sender — clean up.
                 self.inner.remove(id).await;
                 Err(ScreenHubError::SendFailed(id))
             }
         }
     }
 
-    /// Send an envelope to all connected screens except `exclude`.
+    /// Send an envelope to every connected screen except `exclude`.
+    ///
+    /// Uses `try_send` so a slow screen cannot block the others.  Closed
+    /// channels are not cleaned up here — that is handled lazily by the next
+    /// [`send_to`][Self::send_to] call or by the [`ScreenGuard`] drop.
     pub async fn broadcast(&self, envelope: &ScreenEnvelope, exclude: ScreenId) {
         let senders = self.inner.senders.read().await;
 
@@ -155,19 +175,20 @@ impl ScreenRegistry {
                     warn!(screen = %id, "screen channel full during broadcast, dropped");
                 }
                 Err(mpsc::error::TrySendError::Closed(_)) => {
+                    // The ScreenGuard drop will clean this entry up asynchronously;
+                    // no action needed here.
                     warn!(screen = %id, "screen channel closed during broadcast");
-                    // Cleanup happens when the ScreenHandle is dropped.
                 }
             }
         }
     }
 
-    /// Returns the list of currently connected screen ids.
+    /// Return a snapshot of currently connected screen IDs.
     pub async fn connected_screens(&self) -> Vec<ScreenId> {
         self.inner.senders.read().await.keys().copied().collect()
     }
 
-    /// Check if a specific screen is currently connected.
+    /// Return `true` if the given screen is currently registered.
     pub async fn is_connected(&self, id: ScreenId) -> bool {
         self.inner.senders.read().await.contains_key(&id)
     }
@@ -264,10 +285,9 @@ mod tests {
         let envelope = test_envelope(ScreenId::FrontScreen, ScreenTarget::Broadcast);
         registry.broadcast(&envelope, ScreenId::FrontScreen).await;
 
-        // front should NOT receive (it's the sender)
+        // The sender should NOT receive its own broadcast
         assert!(front_rx.try_recv().is_err());
 
-        // back and dmd should receive
         assert!(back_rx.try_recv().is_ok());
         assert!(dmd_rx.try_recv().is_ok());
     }
@@ -283,7 +303,8 @@ mod tests {
         assert!(registry.is_connected(ScreenId::DmdScreen).await);
 
         drop(guard);
-        // Give the spawned cleanup task a moment.
+        // The cleanup task spawned by ScreenGuard::drop is async; give it a
+        // moment to run before asserting the screen is gone.
         tokio::time::sleep(std::time::Duration::from_millis(50)).await;
 
         assert!(!registry.is_connected(ScreenId::DmdScreen).await);

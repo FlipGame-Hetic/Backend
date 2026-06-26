@@ -1,3 +1,5 @@
+//! Generic HP component reused by bosses and any future damageable entity.
+
 #[derive(Debug)]
 pub struct HealthComponent {
     pub max: u32,
@@ -5,10 +7,12 @@ pub struct HealthComponent {
 }
 
 impl HealthComponent {
+    /// Create a component at full health.
     pub fn new(max: u32) -> Self {
         Self { max, current: max }
     }
 
+    /// Reduce HP by `amount`, flooring at 0 (no negative HP).
     pub fn take_damage(&mut self, amount: u32) {
         self.current = self.current.saturating_sub(amount);
     }
@@ -21,6 +25,7 @@ impl HealthComponent {
         self.current = self.max;
     }
 
+    /// Replace max HP and restore to full — used when a new boss spawns with scaled HP.
     pub fn reset_with_new_max(&mut self, new_max: u32) {
         self.max = new_max;
         self.current = new_max;

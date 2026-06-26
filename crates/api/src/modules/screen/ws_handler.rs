@@ -48,6 +48,9 @@ pub async fn ws_screen(
 async fn handle_screen(socket: WebSocket, screen_id: ScreenId, state: AppState) {
     info!(screen = %screen_id, "screen websocket connected");
 
+    // Register the screen in the hub so the router can dispatch envelopes to it.
+    // The returned `_guard` is a drop-guard: when it falls out of scope at the end
+    // of this function, the screen is automatically unregistered
     let handle = match state.screen_registry.register(screen_id).await {
         Ok(h) => h,
         Err(e) => {
@@ -116,6 +119,7 @@ async fn read_loop(
             }
         };
 
+        // Prevent a screen from impersonating another by spoofing the `from` field
         if envelope.from != screen_id {
             warn!(
                 screen = %screen_id,
@@ -144,6 +148,10 @@ async fn read_loop(
     }
 }
 
+/// Translate screen events that carry game-engine side-effects
+///
+/// `RailStart` / `RailEnd` spawn/cancel their own ticker tasks, so they are handled
+/// here before falling through to the generic `GameService::process_screen_event` path
 async fn process_screen_event(state: &AppState, envelope: &ScreenEnvelope) {
     match &envelope.event_type {
         ScreenEventType::StartGame => {
@@ -157,7 +165,7 @@ async fn process_screen_event(state: &AppState, envelope: &ScreenEnvelope) {
             match GameService::new(state).start(character).await {
                 Ok(_) => {}
                 Err(GameServiceError::AlreadyInProgress) => {
-                    warn!("StartGame ignored — game already in progress");
+                    warn!("StartGame ignored game already in progress");
                 }
                 Err(e) => {
                     error!(error = %e, "game service error starting game from screen");
@@ -180,6 +188,9 @@ async fn process_screen_event(state: &AppState, envelope: &ScreenEnvelope) {
     }
 }
 
+/// Pull `ball_id` from an envelope payload, returning `None` when the field is absent
+///
+/// `None` is valid — it means the rail event applies to an untracked ball
 fn extract_ball_id(payload: &serde_json::Value) -> Option<String> {
     payload
         .get("ball_id")
@@ -187,6 +198,11 @@ fn extract_ball_id(payload: &serde_json::Value) -> Option<String> {
         .map(|s| s.to_string())
 }
 
+/// Forward envelopes from the screen_hub channel to the WebSocket sink
+///
+/// The loop exits when the `rx` channel is closed, which happens when the screen
+/// unregisters (its `ScreenHandle` drops). This ensures the write task always
+/// terminates together with the screen's lifetime
 async fn write_loop(
     screen_id: ScreenId,
     mut rx: tokio::sync::mpsc::Receiver<ScreenEnvelope>,

@@ -11,16 +11,22 @@ use tracing::{debug, warn};
 
 use crate::state::AppState;
 
+/// Response body for `GET /api/v1/screens/connected`
 #[derive(Debug, Serialize, Deserialize, JsonSchema)]
 pub struct ConnectedScreensResponse {
     pub screens: Vec<ScreenId>,
     pub count: usize,
 }
 
+/// Result of a manual `ScreenEnvelope` dispatch via `POST /api/v1/screens/send`
 #[derive(Debug, Serialize, Deserialize, JsonSchema)]
 pub struct SendResponse {
+    /// Number of screens that received and acknowledged the envelope
     pub delivered: usize,
+    /// Screens that were targeted but had no active WebSocket connection
     pub missed: Vec<ScreenId>,
+    /// `true` when the envelope was consumed by the screen_hub interceptor (e.g. game engine)
+    /// before reaching the target screen
     pub intercepted: bool,
 }
 

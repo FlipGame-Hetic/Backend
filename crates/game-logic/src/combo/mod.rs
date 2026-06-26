@@ -1,3 +1,5 @@
+//! Combo subsystem — button sequences, streaks, and temporary multipliers.
+
 pub mod detector;
 pub mod error;
 pub mod model;

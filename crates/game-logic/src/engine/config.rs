@@ -248,16 +248,20 @@ impl Default for GameConfig {
     }
 }
 
+/// Global singleton config loaded from defaults and overridable at runtime via the admin API.
 static CONFIG: LazyLock<RwLock<GameConfig>> = LazyLock::new(|| RwLock::new(GameConfig::default()));
 
+/// Read the current config. Panics only if another thread panicked while holding the write lock.
 pub fn get() -> RwLockReadGuard<'static, GameConfig> {
     CONFIG.read().expect("game config lock poisoned")
 }
 
+/// Replace the full config (used by tests and admin full-reset endpoint).
 pub fn set(cfg: GameConfig) {
     *CONFIG.write().expect("game config lock poisoned") = cfg;
 }
 
+/// Apply a partial update only fields present in the patch are changed.
 pub fn apply_patch(patch: GameConfigPatch) {
     let mut cfg = CONFIG.write().expect("game config lock poisoned");
     macro_rules! apply {

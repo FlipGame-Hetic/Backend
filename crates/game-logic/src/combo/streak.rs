@@ -1,9 +1,14 @@
+//! Consecutive-hit streak tracker that boosts the score multiplier.
+//! The streak resets when the gap between two scoring events exceeds `streak_window_ms`.
+
 use std::time::{Duration, Instant};
 
 use crate::engine::config;
 
+/// Tracks how many scoring events happened consecutively within the time window.
 pub struct StreakState {
     count: u32,
+    /// Timestamp of the last recorded event, used to detect gaps.
     last_at: Option<Instant>,
 }
 
@@ -15,30 +20,38 @@ impl StreakState {
         }
     }
 
-    /// Record a scoring event. Returns `(tier_changed, streak_armed)` where
-    /// `tier_changed` is `true` if the multiplier tier changed and
-    /// `streak_armed` is `true` if the new tier is greater than 0.
+    /// Record a scoring event and update the streak counter.
+    ///
+    /// Returns `(tier_changed, streak_armed)`:
+    /// - `tier_changed` the multiplier tier changed, emit a `MultiplierUpdate`
+    /// - `streak_armed` tier > 0, a multiplier is now active
     pub fn record(&mut self, now: Instant) -> (bool, bool) {
         let prev_tier = self.tier();
         let window_ms = config::get().streak_window_ms;
+
         let in_window = self
             .last_at
             .is_some_and(|t| now.duration_since(t) <= Duration::from_millis(window_ms));
+
         if in_window {
             self.count += 1;
         } else {
+            // Gap too large — restart the streak at 1 (this event is the new start).
             self.count = 1;
         }
         self.last_at = Some(now);
+
         let new_tier = self.tier();
         (new_tier != prev_tier, new_tier > 0)
     }
 
+    /// Reset to zero called on ball loss so streaks don't carry across balls.
     pub fn reset(&mut self) {
         self.count = 0;
         self.last_at = None;
     }
 
+    /// Map the current hit count to a tier (0–3) using config thresholds.
     fn tier(&self) -> u8 {
         let cfg = config::get();
         if self.count >= cfg.streak_tier_3_count {
@@ -52,6 +65,7 @@ impl StreakState {
         }
     }
 
+    /// Return the multiplier factor for the current tier (1.0 when no streak).
     pub fn current(&self) -> f32 {
         let cfg = config::get();
         match self.tier() {

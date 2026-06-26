@@ -3,33 +3,38 @@ use axum::response::{IntoResponse, Response};
 use serde::Serialize;
 use thiserror::Error;
 
+/// Domain error type returned by all route handlers
+///
+/// Each variant maps to a specific HTTP status code via `IntoResponse`
 #[derive(Debug, Error)]
 pub enum ApiError {
     #[error("Bad request: {0}")]
-    BadRequest(String),
+    BadRequest(String), // 400
 
     #[error("Not found: {0}")]
-    NotFound(String),
+    NotFound(String), // 404
 
     #[error("Conflict: {0}")]
-    Conflict(String),
+    Conflict(String), // 409
 
     #[error("Unauthorized: {0}")]
-    Unauthorized(String),
+    Unauthorized(String), // 401
 
     #[error("Internal error: {0}")]
-    Internal(String),
+    Internal(String), // 500
 
     #[error("Serialization error: {0}")]
-    Serialization(#[from] serde_json::Error),
+    Serialization(#[from] serde_json::Error), // 400
 }
 
+// All sqlx errors bubble up as 500 — callers never need to match on DB variants
 impl From<sqlx::Error> for ApiError {
     fn from(e: sqlx::Error) -> Self {
         Self::Internal(e.to_string())
     }
 }
 
+/// JSON body shape returned for every error response: `{ "error": "<code>", "message": "<detail>" }`
 #[derive(Debug, Serialize)]
 struct ErrorBody {
     error: String,

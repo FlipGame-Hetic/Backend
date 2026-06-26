@@ -1,3 +1,9 @@
+//! MQTT message routing and deserialisation.
+//!
+//! [`handle_publish`] is the single entry point: it parses the topic string,
+//! dispatches to the right deserialiser, and returns a typed [`Handled`] value
+//! that the bridge can forward over WebSocket without knowing the payload
+//! format.
 use shared::dto::{Subtopic, Topic, TopicError};
 use shared::events::{
     ButtonInput, DeviceEvent, DeviceStatus, GyroInput, InboundMessage, PlungerInput, Telemetry,
@@ -6,14 +12,20 @@ use tracing::{debug, trace, warn};
 
 use crate::errors::{BridgeError, Result};
 
-/// Outcome of handling a single MQTT message.
+/// Outcome of successfully handling a single MQTT publish packet.
 #[derive(Debug)]
 pub struct Handled {
+    /// The device that sent the message, extracted from the topic path.
     pub device_id: String,
+    /// Typed, deserialised representation of the MQTT payload.
     pub message: InboundMessage,
 }
 
-/// Route an incoming MQTT publish to the correct deserializer based on its topic.
+/// Route an incoming MQTT publish to the correct deserialiser based on its
+/// topic subtopic segment.
+///
+/// Returns [`BridgeError::Topic`] for unknown or outbound-only topics and
+/// [`BridgeError::Serialization`] for malformed payloads.
 pub fn handle_publish(topic_str: &str, payload: &[u8]) -> Result<Handled> {
     let topic = Topic::parse(topic_str)?;
 
@@ -38,6 +50,8 @@ pub fn handle_publish(topic_str: &str, payload: &[u8]) -> Result<Handled> {
     })
 }
 
+/// Deserialise a raw MQTT payload into the strongly-typed [`InboundMessage`]
+/// variant that corresponds to the given subtopic.
 fn deserialize(subtopic: &Subtopic, payload: &[u8]) -> Result<InboundMessage> {
     match subtopic {
         Subtopic::InputButton => {
@@ -61,7 +75,10 @@ fn deserialize(subtopic: &Subtopic, payload: &[u8]) -> Result<InboundMessage> {
             Ok(InboundMessage::Event(input))
         }
         Subtopic::Status => {
-            // IOT firmware publishes plain "online"/"offline" strings as LWT/connect payload
+            // The IoT firmware publishes a plain "online" / "offline" ASCII string
+            // as its LWT (Last Will and Testament) message and connect payload.
+            // These are not JSON, so we match bytes directly before attempting
+            // full deserialisation.
             match payload {
                 b"online" => Ok(InboundMessage::Status(DeviceStatus {
                     online: true,
@@ -79,13 +96,16 @@ fn deserialize(subtopic: &Subtopic, payload: &[u8]) -> Result<InboundMessage> {
                     vibrators_ok: vec![],
                     gyro_ok: false,
                 })),
+                // Full JSON status report sent by the firmware on demand or after boot
                 _ => {
                     let input: DeviceStatus = serde_json::from_slice(payload)?;
                     Ok(InboundMessage::Status(input))
                 }
             }
         }
-        // Server → ESP32 topics are outbound-only, we don't deserialize them here.
+        // These subtopics are server → ESP32 only.  Receiving a publish on them
+        // means something is misconfigured; return an error so the caller can
+        // log and skip rather than silently swallowing unknown traffic.
         Subtopic::BallHit | Subtopic::GameState | Subtopic::Cmd => {
             warn!(subtopic = ?subtopic, "received message on outbound-only topic, ignoring");
             Err(BridgeError::Topic(TopicError::UnknownSubtopic(format!(

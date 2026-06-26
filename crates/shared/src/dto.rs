@@ -1,10 +1,16 @@
+//! MQTT topic parsing and construction.
+//!
+//! Every MQTT topic in the system follows the pattern
+//! `pinball/<device_id>/<subtopic>`.  This module defines [`Topic`] to
+//! represent that structure, and [`Subtopic`] for all valid subtopic paths.
 use std::fmt;
 
 use thiserror::Error;
 
-/// Prefix for all MQTT topics in the pinball system.
+/// Prefix that every MQTT topic in the pinball system must start with.
 const TOPIC_PREFIX: &str = "pinball";
 
+/// Errors returned when parsing a raw MQTT topic string fails.
 #[derive(Debug, Error)]
 pub enum TopicError {
     #[error("empty topic string")]
@@ -17,7 +23,19 @@ pub enum TopicError {
     UnknownSubtopic(String),
 }
 
-/// All valid subtopics under `pinball/<device_id>/`.
+/// All valid path segments after `pinball/<device_id>/`.
+///
+/// | Variant        | MQTT path        | Direction          |
+/// |----------------|------------------|--------------------|
+/// | InputButton    | `input/button`   | ESP32 → server     |
+/// | InputPlunger   | `input/plunger`  | ESP32 → server     |
+/// | InputGyro      | `input/gyro`     | ESP32 → server     |
+/// | Telemetry      | `telemetry`      | ESP32 → server     |
+/// | Events         | `events`         | ESP32 → server     |
+/// | Status         | `status`         | ESP32 → server     |
+/// | BallHit        | `ball/hit`       | server → ESP32     |
+/// | GameState      | `game/state`     | server → ESP32     |
+/// | Cmd            | `cmd`            | server → ESP32     |
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Subtopic {
     InputButton,
@@ -56,7 +74,8 @@ impl Subtopic {
             ["telemetry"] => Ok(Self::Telemetry),
             ["events"] => Ok(Self::Events),
             ["cmd"] => Ok(Self::Cmd),
-            // "status" and legacy "esp32/status" (IOT firmware uses the longer path)
+            // Accept both "status" and "esp32/status" older firmware versions
+            // published on the longer path.
             ["status"] | ["esp32", "status"] => Ok(Self::Status),
             other => {
                 let joined = other.join("/");
@@ -66,15 +85,20 @@ impl Subtopic {
     }
 }
 
-/// Parsed MQTT topic: `pinball/<device_id>/<subtopic>`
+/// A parsed MQTT topic in the form `pinball/<device_id>/<subtopic>`.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Topic {
+    /// The unique identifier of the physical device (e.g. `"esp01"`).
     pub device_id: String,
+    /// Which data channel this topic represents.
     pub subtopic: Subtopic,
 }
 
 impl Topic {
-    /// Build a full topic str for publishing
+    /// Build the full MQTT topic string from this struct.
+    ///
+    /// Example: `Topic { device_id: "esp01", subtopic: Subtopic::InputButton }`
+    /// → `"pinball/esp01/input/button"`
     pub fn to_mqtt_topic(&self) -> String {
         format!(
             "{}/{}/{}",
@@ -84,7 +108,10 @@ impl Topic {
         )
     }
 
-    /// Parse a raw MQTT topic string into a structured `Topic`
+    /// Parse a raw MQTT topic string into a [`Topic`].
+    ///
+    /// Returns an error if the string is empty, missing the `"pinball"` prefix,
+    /// missing a device-id segment, or has an unrecognised subtopic path.
     pub fn parse(raw: &str) -> Result<Self, TopicError> {
         if raw.is_empty() {
             return Err(TopicError::Empty);
@@ -109,12 +136,17 @@ impl Topic {
         })
     }
 
-    /// MQTT subscription pattern to capture all topic for every device
+    /// MQTT subscription filter that matches all topics for every device.
+    ///
+    /// Returns `"pinball/+/#"`, `+` matches exactly one segment (device id),
+    /// `#` matches anything that follows (the subtopic path).
     pub fn subscribe_all() -> &'static str {
         "pinball/+/#"
     }
 
-    /// MQTT subscriptions pattern for a specific device
+    /// MQTT subscription filter for a single specific device.
+    ///
+    /// Returns `"pinball/<device_id>/#"`.
     pub fn subscribe_device(device_id: &str) -> String {
         format!("{TOPIC_PREFIX}/{device_id}/#")
     }

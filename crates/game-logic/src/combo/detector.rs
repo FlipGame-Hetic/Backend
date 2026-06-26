@@ -1,16 +1,19 @@
+//! Detects button-press combos from a rolling buffer of recent inputs.
+
 use std::collections::VecDeque;
 use std::time::Instant;
 
 use crate::combo::model::{ButtonPress, ComboDefinition, ComboEffect, ComboResult};
 use crate::engine::config;
 
+/// Build the static combo table ordered longest → shortest so the first match
+/// is always the most specific one (no shorter suffix can fire instead).
 fn combo_table() -> Vec<ComboDefinition> {
     use ButtonPress::{Left as G, Right as D};
     let cfg = config::get();
     let window = cfg.combo_detection_window_ms;
     vec![
-        // 7-button combos first (longest → highest priority)
-        // Very hard: pure alternating
+        // Very hard: pure alternating rhythm
         ComboDefinition {
             id: 14,
             sequence: vec![D, G, D, G, D, G, D],
@@ -48,7 +51,6 @@ fn combo_table() -> Vec<ComboDefinition> {
             max_duration_ms: window,
             bonus_pts: cfg.combo_8_bonus,
         },
-        // 6-button combos
         // Hard: alternating patterns
         ComboDefinition {
             id: 9,
@@ -87,7 +89,6 @@ fn combo_table() -> Vec<ComboDefinition> {
             max_duration_ms: window,
             bonus_pts: cfg.combo_5_bonus,
         },
-        // 5-button combos
         ComboDefinition {
             id: 2,
             sequence: vec![G, G, D, D, G],
@@ -97,7 +98,10 @@ fn combo_table() -> Vec<ComboDefinition> {
     ]
 }
 
+/// Stateful combo detector: keeps a rolling buffer of recent button presses
+/// and checks for matching sequences after each new press.
 pub struct ComboDetector {
+    /// Sliding window of (button, timestamp) pairs — oldest at the front.
     buffer: VecDeque<(ButtonPress, Instant)>,
     table: Vec<ComboDefinition>,
 }
@@ -111,6 +115,8 @@ impl ComboDetector {
         }
     }
 
+    /// Record a new button press. Checks for spam penalty first, then combo
+    /// match. Clears the buffer after a penalty or successful combo.
     pub fn push(&mut self, button: ButtonPress, now: Instant) -> ComboResult {
         let buffer_max = config::get().combo_buffer_max;
         if self.buffer.len() >= buffer_max {
@@ -118,18 +124,23 @@ impl ComboDetector {
         }
         self.buffer.push_back((button, now));
 
+        // Penalty check runs before matching so spam can never complete a combo.
         if let Some(penalty) = self.check_penalty() {
             self.buffer.clear();
             return penalty;
         }
 
         let result = self.match_combos(now);
+        // Clear after a hit so the same presses can't feed into the next combo.
         if matches!(result, ComboResult::Activated(_)) {
             self.buffer.clear();
         }
         result
     }
 
+    /// Scan the combo table against the tail of the buffer (longest match first).
+    /// Both the buffer tail and the sequence definition are compared in reverse
+    /// so index 0 always means "most recent press".
     fn match_combos(&self, now: Instant) -> ComboResult {
         for combo in &self.table {
             let n = combo.sequence.len();
@@ -148,6 +159,7 @@ impl ComboDetector {
                 continue;
             }
 
+            // `tail[n-1]` is the oldest press that belongs to this match.
             let oldest_time = tail[n - 1].1;
             let elapsed = now.duration_since(oldest_time).as_millis() as u64;
             if elapsed <= combo.max_duration_ms {
@@ -170,6 +182,8 @@ impl ComboDetector {
         ComboResult::None
     }
 
+    /// Return a penalty if the last `combo_penalty_repeat` presses are all
+    /// the same button (pure left-spam or right-spam).
     fn check_penalty(&self) -> Option<ComboResult> {
         let cfg = config::get();
         if self.buffer.len() < cfg.combo_penalty_repeat {
@@ -208,6 +222,7 @@ mod tests {
 
     use super::*;
 
+    /// Push a sequence of buttons spaced 100 ms apart, return the last result.
     fn press_seq(detector: &mut ComboDetector, seq: &[ButtonPress], now: Instant) -> ComboResult {
         let mut result = ComboResult::None;
         for (i, btn) in seq.iter().enumerate() {

@@ -1,40 +1,51 @@
+//! Message routing layer on top of [`ScreenRegistry`].
+//!
+//! [`ScreenRouter`] is the single entry point for dispatching a
+//! [`ScreenEnvelope`] to its intended target(s).  Before delivery it runs the
+//! envelope through a configurable chain of [`Interceptor`]s, any of which can
+//! mutate or swallow the message.
 use shared::screen::{ScreenEnvelope, ScreenId, ScreenTarget};
 use tracing::{debug, warn};
 
 use crate::error::ScreenHubError;
 use crate::registry::ScreenRegistry;
 
-/// Routes `ScreenEnvelope` messages to the correct screens via the registry.
+/// Routes [`ScreenEnvelope`] messages to the correct screens via the registry.
 ///
 /// This is the single entry point for dispatching screen-to-screen messages.
-/// Today it does pure routing. Tomorrow a processing pipeline (score calculation,
-/// combo detection, etc.) can be inserted here via the `Interceptor` trait
-/// without touching the WS handler or the registry.
+/// The interceptor pipeline runs first; only if all interceptors pass does the
+/// message reach the registry.  New processing steps (e.g. score enrichment,
+/// combo detection, validation) can be added as interceptors without touching
+/// the WS handler or the registry.
 pub struct ScreenRouter {
     registry: ScreenRegistry,
+    /// Ordered list of interceptors.  Each one sees the (possibly mutated)
+    /// envelope from the previous step; returning `None` short-circuits the
+    /// rest of the chain and prevents delivery.
     interceptors: Vec<Box<dyn Interceptor>>,
 }
 
-/// Hook point for future message processing.
+/// Hook point for preprocessing messages before they are dispatched.
 ///
-/// Interceptors run **before** the message is dispatched. They can:
-/// - Inspect / log the message
-/// - Mutate the envelope (e.g. enrich payload)
-/// - Return `None` to swallow the message (e.g. validation failure)
+/// Interceptors run **before** delivery, in registration order.  They can:
+/// - Inspect or log the envelope
+/// - Mutate fields (e.g. enrich the payload)
+/// - Return `None` to swallow the message (e.g. failed validation)
 ///
-/// Interceptors are called in order. If any returns `None`, dispatch is skipped.
+/// If any interceptor returns `None`, the remaining interceptors are skipped
+/// and the message is never delivered.
 pub trait Interceptor: Send + Sync {
     fn process(&self, envelope: ScreenEnvelope) -> Option<ScreenEnvelope>;
 }
 
-/// Outcome of a `dispatch` call.
+/// Summary of what happened during a [`ScreenRouter::dispatch`] call.
 #[derive(Debug)]
 pub struct DispatchResult {
-    /// Number of screens the message was successfully delivered to.
+    /// Number of screens the message was successfully enqueued to.
     pub delivered: usize,
-    /// Screens that were targeted but not connected.
+    /// Screens that were targeted but not currently connected.
     pub missed: Vec<ScreenId>,
-    /// Whether the message was swallowed by an interceptor.
+    /// `true` if an interceptor returned `None` and prevented delivery.
     pub intercepted: bool,
 }
 
@@ -46,17 +57,22 @@ impl ScreenRouter {
         }
     }
 
-    /// Add an interceptor to the processing pipeline.
+    /// Append an interceptor to the end of the processing pipeline.
+    ///
+    /// Interceptors are invoked in the order they are added.
     pub fn add_interceptor(&mut self, interceptor: Box<dyn Interceptor>) {
         self.interceptors.push(interceptor);
     }
 
-    /// Main entry point: route an envelope to its intended target(s).
+    /// Route an envelope to its target(s) after running the interceptor chain.
+    ///
+    /// Returns a [`DispatchResult`] describing delivery outcome regardless of
+    /// whether the envelope was intercepted, missed, or delivered.
     pub async fn dispatch(&self, envelope: ScreenEnvelope) -> DispatchResult {
-        // Run interceptor pipeline
         let envelope = match self.run_interceptors(envelope) {
             Some(e) => e,
             None => {
+                // An interceptor returned None; stop here without dispatching.
                 debug!(event_type = %"intercepted", "message swallowed by interceptor");
                 return DispatchResult {
                     delivered: 0,
@@ -72,6 +88,10 @@ impl ScreenRouter {
         }
     }
 
+    /// Run the envelope through every interceptor in order.
+    ///
+    /// Uses the `?` operator on `Option` to short-circuit as soon as one
+    /// interceptor returns `None`, skipping all subsequent interceptors.
     fn run_interceptors(&self, mut envelope: ScreenEnvelope) -> Option<ScreenEnvelope> {
         for interceptor in &self.interceptors {
             envelope = interceptor.process(envelope)?;
@@ -79,6 +99,7 @@ impl ScreenRouter {
         Some(envelope)
     }
 
+    /// Deliver a message to exactly one target screen.
     async fn dispatch_to_one(&self, target: ScreenId, envelope: &ScreenEnvelope) -> DispatchResult {
         match self.registry.send_to(target, envelope).await {
             Ok(true) => {
@@ -126,11 +147,18 @@ impl ScreenRouter {
         }
     }
 
+    /// Broadcast a message to all connected screens except the sender.
+    ///
+    /// `delivered` is derived from [`ScreenRegistry::connected_screens`]
+    /// **after** the broadcast, so it may be slightly off if a screen connects
+    /// or disconnects in the window between the two calls — treat it as
+    /// approximate.
     async fn dispatch_broadcast(&self, envelope: &ScreenEnvelope) -> DispatchResult {
         let sender = envelope.from;
 
         self.registry.broadcast(envelope, sender).await;
 
+        // Snapshot taken after broadcast to count recipients; see doc note above.
         let connected = self.registry.connected_screens().await;
         let delivered = connected.iter().filter(|&&id| id != sender).count();
 
@@ -179,7 +207,7 @@ mod tests {
         }
     }
 
-    /// Interceptor that mutates the event_type.
+    /// Interceptor that prepends `"mutated_"` to the event type string.
     struct Mutator;
     impl Interceptor for Mutator {
         fn process(&self, mut envelope: ScreenEnvelope) -> Option<ScreenEnvelope> {
@@ -354,7 +382,7 @@ mod tests {
         let registry = ScreenRegistry::new();
         let mut router = ScreenRouter::new(registry.clone());
         router.add_interceptor(Box::new(Swallow));
-        router.add_interceptor(Box::new(Mutator)); // should never run
+        router.add_interceptor(Box::new(Mutator)); // must never run
 
         let (mut rx, _guard) = registry
             .register(ScreenId::BackScreen)

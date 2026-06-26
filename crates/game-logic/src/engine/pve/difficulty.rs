@@ -1,5 +1,9 @@
+//! Boss HP scaling formulas — translates config difficulty factors into actual HP values.
+
 use crate::engine::config;
 
+/// Scale `base_hp` by the difficulty factor for `boss_index`.
+/// For endless bosses (index ≥ 3) HP grows exponentially with `endless_level`.
 pub fn scale_hp(base_hp: u32, boss_index: u8, endless_level: u32) -> u32 {
     let cfg = config::get();
     let factor = match boss_index {
@@ -15,6 +19,8 @@ pub fn scale_hp(base_hp: u32, boss_index: u8, endless_level: u32) -> u32 {
     (base_hp as f32 * factor) as u32
 }
 
+/// Convert player score points into boss HP damage.
+/// Currently 1:1 — kept as a separate function so the formula can be tuned later.
 pub fn boss_damage_to_health(bumper_pts: u32, _boss_index: u8) -> u32 {
     bumper_pts
 }

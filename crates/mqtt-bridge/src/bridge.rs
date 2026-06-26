@@ -1,3 +1,11 @@
+//! Core relay logic: three concurrent tasks wired together to bridge MQTT and
+//! WebSocket.
+//!
+//! The data flow is:
+//! ```text
+//! MQTT broker ──► mqtt_inbound_loop ──► [mpsc channel] ──► ws_write_loop ──► central API
+//! central API ──► ws_outbound_loop  ──► MQTT broker
+//! ```
 use futures_util::{SinkExt, StreamExt};
 use rumqttc::{AsyncClient, Event, EventLoop, Packet, QoS};
 use shared::dto::{Subtopic, Topic};
@@ -11,18 +19,21 @@ use crate::config::BridgeConfig;
 use crate::errors::Result;
 use crate::handler;
 
-/// Channel capacity for internal message passing between tasks.
+/// Depth of the mpsc channel that connects the MQTT inbound task to the WS
+/// write task.  256 provides headroom for short traffic bursts without letting
+/// memory grow unboundedly.
 const INTERNAL_CHANNEL_SIZE: usize = 256;
 
 /// Bidirectional relay between MQTT (local broker) and WebSocket (central API).
 ///
 /// Runs three concurrent tasks:
-/// 1. **mqtt_loop**: polls the MQTT event loop, parses inbound publishes,
-///    and forwards them as `WsMessage::Inbound` to the WS sender.
-/// 2. **ws_read_loop**: reads `WsMessage::Outbound` from the API and
-///    forwards them as MQTT publishes to the local broker.
-/// 3. **ws_write_loop**: drains the internal channel and writes JSON frames
-///    to the WebSocket sink.
+/// 1. **`mqtt_inbound_loop`**: polls the MQTT event loop, parses inbound
+///    `Publish` packets, and forwards them as `WsMessage::Inbound` to the WS
+///    write task.
+/// 2. **`ws_outbound_loop`**: reads `WsMessage::Outbound` frames from the API
+///    and publishes them to the local MQTT broker.
+/// 3. **`ws_write_loop`**: drains the internal channel and serialises each
+///    message as a JSON text frame to the WebSocket sink.
 pub struct Bridge {
     config: BridgeConfig,
 }
@@ -33,6 +44,11 @@ impl Bridge {
     }
 
     /// Run the bridge forever, reconnecting on failure.
+    ///
+    /// Returns `!` — this function never resolves normally.  Each loop
+    /// iteration calls [`run_once`][Self::run_once], which exits when any of
+    /// the three relay tasks terminates.  After a configurable back-off delay
+    /// the whole connection is re-established from scratch.
     pub async fn run(&self) -> ! {
         loop {
             info!("starting bridge relay");
@@ -48,13 +64,15 @@ impl Bridge {
     }
 
     /// Single connection lifecycle: connect both sides, relay until one drops.
+    ///
+    /// Spawns the three relay tasks and uses `tokio::select!` so that the
+    /// **first** task to exit — cleanly or with an error — causes this function
+    /// to return.  The remaining task handles are dropped, which aborts them.
     async fn run_once(&self) -> Result<()> {
-        // MQTT client
         let mqtt = MqttClient::new(&self.config);
         mqtt.subscribe_all().await?;
         let (mqtt_client, mqtt_event_loop) = mqtt.split();
 
-        // WebSocket client
         info!(url = %self.config.backend_ws_url, "connecting to central API");
 
         let (ws_stream, _response) =
@@ -64,16 +82,16 @@ impl Bridge {
 
         let (ws_sink, ws_source) = ws_stream.split();
 
-        // Internal channel: mqtt_loop → ws_write_loop
+        // Bounded channel so a slow WS sink back-pressures the MQTT task rather
+        // than accumulating messages in memory during a traffic burst.
         let (ws_tx, ws_rx) = mpsc::channel::<WsMessage>(INTERNAL_CHANNEL_SIZE);
 
-        // Spawn all three tasks, abort on first failure
         let mqtt_handle = tokio::spawn(mqtt_inbound_loop(mqtt_event_loop, ws_tx));
-
         let ws_write_handle = tokio::spawn(ws_write_loop(ws_rx, ws_sink));
-
         let ws_read_handle = tokio::spawn(ws_outbound_loop(ws_source, mqtt_client));
 
+        // Wait for whichever task finishes first; dropping the remaining handles
+        // cancels those tasks so we don't leave orphaned futures running.
         tokio::select! {
             res = mqtt_handle => {
                 let msg = "mqtt loop exited";
@@ -105,8 +123,8 @@ impl Bridge {
     }
 }
 
-// Task 1: MQTT event loop => parse => channel
-
+/// Poll the MQTT event loop, parse `Publish` packets, and forward them to the
+/// WebSocket write task via the internal channel.
 async fn mqtt_inbound_loop(
     mut event_loop: EventLoop,
     ws_tx: mpsc::Sender<WsMessage>,
@@ -117,6 +135,8 @@ async fn mqtt_inbound_loop(
         let event = match event_loop.poll().await {
             Ok(event) => event,
             Err(e) => {
+                // Non-fatal poll error (e.g. transient TCP hiccup); sleep briefly
+                // to avoid a tight error loop that would burn CPU.
                 error!(error = %e, "mqtt poll error");
                 tokio::time::sleep(std::time::Duration::from_secs(1)).await;
                 continue;
@@ -142,12 +162,15 @@ async fn mqtt_inbound_loop(
                             payload: handled.message,
                         };
 
+                        // A closed channel means the WS write task has already
+                        // exited; stop cleanly so the bridge can reconnect.
                         if ws_tx.send(ws_msg).await.is_err() {
                             warn!("WS channel closed, stopping mqtt loop");
                             return Ok(());
                         }
                     }
                     Err(e) => {
+                        // Unrecognised or outbound-only topic — skip without crashing.
                         debug!(topic, error = %e, "Skipping unhandled message");
                     }
                 }
@@ -158,6 +181,8 @@ async fn mqtt_inbound_loop(
             Event::Incoming(Packet::SubAck(_)) => {
                 debug!("MQTT subscription acknowledged");
             }
+            // PingResp keeps the TCP session alive; outgoing packets are our own
+            // queued publishes.  Neither requires any action here.
             Event::Incoming(Packet::PingResp) | Event::Outgoing(_) => {}
             other => {
                 debug!(event = ?other, "Unhandled MQTT event");
@@ -166,8 +191,8 @@ async fn mqtt_inbound_loop(
     }
 }
 
-// Task 2: Channel => WebSocket sink
-
+/// Drain the internal channel and write each message as a JSON text frame to
+/// the WebSocket sink.
 async fn ws_write_loop<S>(mut rx: mpsc::Receiver<WsMessage>, mut sink: S) -> Result<()>
 where
     S: SinkExt<WsRawMessage, Error = tokio_tungstenite::tungstenite::Error> + Unpin,
@@ -182,12 +207,13 @@ where
         sink.send(WsRawMessage::Text(json.into())).await?;
     }
 
+    // All senders were dropped (mqtt_inbound_loop exited); signal clean shutdown.
     info!("WS write loop ended (channel closed)");
     Ok(())
 }
 
-// Task 3: WebSocket source => MQTT publish
-
+/// Read JSON frames from the WebSocket and publish `Outbound` commands to the
+/// MQTT broker.
 async fn ws_outbound_loop<S>(mut source: S, mqtt_client: AsyncClient) -> Result<()>
 where
     S: StreamExt<Item = std::result::Result<WsRawMessage, tokio_tungstenite::tungstenite::Error>>
@@ -200,9 +226,12 @@ where
 
         let text = match &frame {
             WsRawMessage::Text(t) => t.as_ref(),
+            // Ping/Pong are handled transparently by tungstenite; no action needed.
             WsRawMessage::Ping(_) => continue,
             WsRawMessage::Pong(_) => continue,
             WsRawMessage::Close(_) => {
+                // Graceful close from the server; return cleanly so the bridge
+                // reconnects instead of spinning on a dead stream.
                 info!("Central API closed websocket");
                 return Ok(());
             }
@@ -230,6 +259,7 @@ where
                     warn!(device_id, error = %e, "Failed to publish outbound to MQTT");
                 }
             }
+            // The API should only ever send Outbound messages to this endpoint.
             WsMessage::Inbound { .. } => {
                 warn!("Received inbound message from API (unexpected direction), ignoring");
             }
@@ -240,8 +270,11 @@ where
     Ok(())
 }
 
-// Helpers
-
+/// Publish an outbound command from the central API to the per-device MQTT topic.
+///
+/// `retain` is `true` only for `GameState` so that a freshly connected ESP32
+/// immediately receives the current game state without waiting for the next
+/// server-side update cycle.
 async fn publish_outbound(
     client: &AsyncClient,
     device_id: &str,
@@ -249,6 +282,7 @@ async fn publish_outbound(
 ) -> Result<()> {
     let (subtopic, retain) = match payload {
         OutboundMessage::BallHit(_) => (Subtopic::BallHit, false),
+        // Retained so a rebooting device gets the current state as soon as it subscribes
         OutboundMessage::GameState(_) => (Subtopic::GameState, true),
         OutboundMessage::Command(_) => (Subtopic::Cmd, false),
     };

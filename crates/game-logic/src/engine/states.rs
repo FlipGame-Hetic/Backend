@@ -1,7 +1,10 @@
+//! Game-wide state types: phase machine, tilt tracker, and the full `GameState`.
+
 use std::time::Instant;
 
 use crate::engine::config;
 
+/// Lifecycle phase of a game session.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum GamePhase {
     Idle,
@@ -9,12 +12,17 @@ pub enum GamePhase {
     GameOver,
 }
 
+/// What happens when the pinball machine tilts.
 #[derive(Debug, Clone)]
 pub enum TiltEffect {
+    /// Deduct `pts` from the score (negative value).
     Penalty(i64),
+    /// Third tilt in a session — score is locked for the rest of the game.
     CheatingDetected,
 }
 
+/// Counts how many times the machine tilted this session.
+/// First tilt → small penalty, second → large penalty, third+ → cheating lock.
 #[derive(Debug, Clone, Default)]
 pub struct TiltState {
     pub count: u8,
@@ -36,6 +44,8 @@ impl TiltState {
     }
 }
 
+/// Full mutable state of a running game session.
+/// Owned by `GameEngine` and cloned into `GameSnapshot` for API responses.
 #[derive(Debug, Clone)]
 pub struct GameState {
     pub phase: GamePhase,
@@ -44,6 +54,7 @@ pub struct GameState {
     pub tilt_state: TiltState,
     pub balls_lost_since_start: u32,
     pub session_start: Option<Instant>,
+    /// When true, `add_score` becomes a no-op triggered by the third tilt.
     pub cheating_detected: bool,
     pub extra_balls: u8,
     pub shield_active: bool,
@@ -53,20 +64,20 @@ pub struct GameState {
 
     // Ultimate charge
     pub ultimate_charge: u32,
-    /// Sub-100-point remainder carried over between scoring events.
+    /// Sub-threshold remainder carried between scoring events to avoid rounding loss.
     pub point_buffer: u32,
-    /// Fractional accumulator for time-based charge (Oracle).
+    /// Fractional accumulator for time-based charge (Oracle character only).
     pub time_charge_buffer: f32,
 
-    // Ulti state machine (lazy eval — no timers)
+    // Ulti state machine expiry checked lazily on each `process` call, no background timer.
     pub ulti_ends_at: Option<Instant>,
     pub ulti_duration_ms: u64,
     pub ulti_cancellable: bool,
     pub ulti_active_id: Option<String>,
-    /// Forces `effective_multiplier` to exactly this value while ulti is active (Viper).
+    /// Overrides `effective_multiplier` to a fixed value while ulti is active (Viper rampage).
     pub ulti_multiplier_override: Option<f32>,
 
-    // Ghost cycle (reset on StartGame)
+    /// Which ulti Ghost will fire next (cycles through 3 options, resets on StartGame).
     pub ghost_cycle_index: u8,
 }
 
@@ -97,6 +108,7 @@ impl GameState {
         }
     }
 
+    /// Add points to the score. Silently ignored when cheating is detected.
     pub fn add_score(&mut self, pts: u64) {
         if !self.cheating_detected {
             self.score = self.score.saturating_add(pts);
@@ -109,11 +121,11 @@ impl GameState {
         }
     }
 
+    /// Return `true` if a sustained ulti is currently running (not yet expired).
     pub fn is_ulti_active(&self, now: Instant) -> bool {
         self.ulti_ends_at.map(|t| now < t).unwrap_or(false)
     }
 
-    /// Remaining charge at `now` during a sustained ulti (linear drain).
     pub fn residual_charge(&self, now: Instant) -> u32 {
         let Some(ends_at) = self.ulti_ends_at else {
             return 0;
@@ -121,12 +133,12 @@ impl GameState {
         if now >= ends_at || self.ulti_duration_ms == 0 {
             return 0;
         }
-        // We can't store charge_max here, so callers pass it.
-        // This method only computes the fraction; the caller multiplies by charge_max.
-        // Keep it simple: store nothing extra — callers use residual_charge_with_max.
+        // charge_max is not stored here use residual_charge_with_max instead.
         0
     }
 
+    /// Compute how much ultimate charge remains during a sustained ulti (linear drain).
+    /// Used to display the charge bar and to restore partial charge on cancel.
     pub fn residual_charge_with_max(&self, now: Instant, charge_max: u32) -> u32 {
         let Some(ends_at) = self.ulti_ends_at else {
             return 0;

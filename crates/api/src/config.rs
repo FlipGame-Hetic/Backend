@@ -9,21 +9,27 @@ pub enum ConfigError {
     Invalid(String),
 }
 
+/// Runtime configuration loaded from environment variables at startup
 #[derive(Debug, Clone)]
 pub struct ApiConfig {
+    /// TCP port the HTTP server listens on defaults to 8080
     pub port: u16,
+    /// CORS allowed origins; a single `"*"` entry opens CORS to any origin
     pub allowed_origins: Vec<String>,
+    /// HMAC-SHA256 secret used for both admin JWTs and screen JWTs — must be ≥ 32 chars
     pub jwt_secret: String,
+    /// SQLite connection URL, e.g. `sqlite:///data/flipper.db`
     pub database_url: String,
 }
 
 impl ApiConfig {
+    /// Read config from the actual process environment
     pub fn from_env() -> Result<Self, ConfigError> {
         let vars: HashMap<String, String> = std::env::vars().collect();
         Self::from_map(&vars)
     }
 
-    /// Pure constructor used by tests — reads from an explicit map instead of the process env.
+    /// Pure constructor used by tests reads from an explicit map instead of the process env.
     pub fn from_map(vars: &HashMap<String, String>) -> Result<Self, ConfigError> {
         let port = vars
             .get("API_PORT")
@@ -45,6 +51,7 @@ impl ApiConfig {
             ConfigError::Invalid("SCREEN_JWT_SECRET env var is required".to_owned())
         })?;
 
+        // 32 chars is the minimum to satisfy HMAC-SHA256 key strength requirements
         if jwt_secret.len() < 32 {
             return Err(ConfigError::Invalid(
                 "SCREEN_JWT_SECRET must be at least 32 characters".to_owned(),

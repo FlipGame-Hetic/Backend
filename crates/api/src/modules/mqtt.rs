@@ -4,7 +4,7 @@ use shared::events::{
     Telemetry,
 };
 
-// Virtual documentation functions — never called at runtime.
+// Virtual documentation functions never called at runtime.
 // They exist solely to register MQTT topics in the Lucyd registry at link time
 // via inventory::submit!, so the /docs UI can display them.
 //

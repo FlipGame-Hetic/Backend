@@ -7,7 +7,12 @@ use crate::config::ApiConfig;
 use crate::router;
 use crate::state::AppState;
 
+/// Assemble the Axum router with CORS, tracing middleware, and shared state
+///
+/// Called once at startup; the returned `Router` is handed directly to `axum::serve`
 pub fn build(config: &ApiConfig, db_pool: SqlitePool) -> Router {
+    // A single "*" in ALLOWED_ORIGINS means open CORS (dev/CI use).
+    // Any other value is treated as an explicit allowlist — invalid entries are silently skipped
     let cors = if config.allowed_origins.iter().any(|o| o == "*") {
         CorsLayer::new()
             .allow_origin(Any)
