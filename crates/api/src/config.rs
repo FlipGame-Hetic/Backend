@@ -12,7 +12,7 @@ pub enum ConfigError {
 /// Runtime configuration loaded from environment variables at startup
 #[derive(Debug, Clone)]
 pub struct ApiConfig {
-    /// TCP port the HTTP server listens on — defaults to 8080
+    /// TCP port the HTTP server listens on defaults to 8080
     pub port: u16,
     /// CORS allowed origins; a single `"*"` entry opens CORS to any origin
     pub allowed_origins: Vec<String>,
@@ -29,7 +29,7 @@ impl ApiConfig {
         Self::from_map(&vars)
     }
 
-    /// Pure constructor used by tests — reads from an explicit map instead of the process env.
+    /// Pure constructor used by tests reads from an explicit map instead of the process env.
     pub fn from_map(vars: &HashMap<String, String>) -> Result<Self, ConfigError> {
         let port = vars
             .get("API_PORT")

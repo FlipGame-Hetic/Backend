@@ -41,7 +41,7 @@ pub struct GameService<'a> {
 
 /// Results extracted from the engine while both mutex guards are held.
 ///
-/// `session_snapshot` is `Some` exclusively when `game_over` is true — it carries
+/// `session_snapshot` is `Some` exclusively when `game_over` is true it carries
 /// the session data needed to persist the final score. If it is `None` on a game-over
 /// path, the engine existed without a corresponding session (corrupt state).
 struct EngineResult {

@@ -165,7 +165,7 @@ async fn process_screen_event(state: &AppState, envelope: &ScreenEnvelope) {
             match GameService::new(state).start(character).await {
                 Ok(_) => {}
                 Err(GameServiceError::AlreadyInProgress) => {
-                    warn!("StartGame ignored — game already in progress");
+                    warn!("StartGame ignored game already in progress");
                 }
                 Err(e) => {
                     error!(error = %e, "game service error starting game from screen");

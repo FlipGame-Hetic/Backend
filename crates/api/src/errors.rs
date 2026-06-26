@@ -9,19 +9,19 @@ use thiserror::Error;
 #[derive(Debug, Error)]
 pub enum ApiError {
     #[error("Bad request: {0}")]
-    BadRequest(String),      // 400
+    BadRequest(String), // 400
 
     #[error("Not found: {0}")]
-    NotFound(String),        // 404
+    NotFound(String), // 404
 
     #[error("Conflict: {0}")]
-    Conflict(String),        // 409
+    Conflict(String), // 409
 
     #[error("Unauthorized: {0}")]
-    Unauthorized(String),    // 401
+    Unauthorized(String), // 401
 
     #[error("Internal error: {0}")]
-    Internal(String),        // 500
+    Internal(String), // 500
 
     #[error("Serialization error: {0}")]
     Serialization(#[from] serde_json::Error), // 400

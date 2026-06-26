@@ -7,14 +7,14 @@ use tracing::warn;
 ///
 /// Tokens are pre-generated and stored in frontend `.env` files.
 /// The backend validates them on WebSocket upgrade to identify which
-/// screen is connecting. There is no expiration by design — these are
+/// screen is connecting. There is no expiration by design these are
 /// device-identity tokens, not user-session tokens.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ScreenClaims {
     /// The screen this token identifies.
     pub screen_id: ScreenId,
 
-    /// Standard JWT subject — set to the screen id string for convenience.
+    /// Standard JWT subject set to the screen id string for convenience.
     pub sub: String,
 }
 
@@ -147,7 +147,7 @@ mod tests {
     /// Run with: cargo test -p api print_all_screen_tokens -- --nocapture
     ///
     /// Prints JWT tokens for all screens, ready to paste into frontend `.env` files.
-    /// Uses the dev secret by default — set SCREEN_JWT_SECRET env var to override.
+    /// Uses the dev secret by default set SCREEN_JWT_SECRET env var to override.
     #[test]
     fn print_all_screen_tokens() {
         let secret = std::env::var("SCREEN_JWT_SECRET")

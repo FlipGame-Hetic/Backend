@@ -90,7 +90,7 @@ pub async fn end_game(State(state): State<AppState>) -> Result<impl IntoResponse
 /// Returns the full character roster with their live game-engine parameters.
 ///
 /// Values are read directly from [`game_logic`] structs and the runtime [`GameConfig`],
-/// so they always reflect the current admin configuration — patching the config via
+/// so they always reflect the current admin configuration patching the config via
 /// `PATCH /api/v1/admin/config` is immediately visible here without a restart.
 ///
 /// Visual assets, display names, and lore copy live in the frontend config; this
@@ -100,7 +100,7 @@ pub async fn get_characters() -> impl IntoResponse {
     use game_logic::{UltiShape, select_character};
 
     // Acquire the config read-guard once for the whole iterator instead of once per
-    // character — `stats()` also calls `config::get()` internally but releases it
+    // character `stats()` also calls `config::get()` internally but releases it
     // immediately; holding this guard concurrently is safe because it is a RwLock.
     let cfg = game_logic::engine::config::get();
 
@@ -117,7 +117,7 @@ pub async fn get_characters() -> impl IntoResponse {
             let profile = c.stats().charge_profile;
 
             // Start with the fields that are common across all characters, then
-            // add shape-specific and character-specific keys below.
+            // add shape-specific and character-specific keys below
             let mut obj = serde_json::json!({
                 "id": c.slug(),
                 "ulti_id": c.ulti_id(),
@@ -143,7 +143,10 @@ pub async fn get_characters() -> impl IntoResponse {
                     obj["shape"] = serde_json::json!("instant");
                     obj["cancellable"] = serde_json::json!(false);
                 }
-                UltiShape::Sustained { duration_ms, cancellable } => {
+                UltiShape::Sustained {
+                    duration_ms,
+                    cancellable,
+                } => {
                     obj["shape"] = serde_json::json!("sustained");
                     obj["cancellable"] = serde_json::json!(cancellable);
                     obj["duration_ms"] = serde_json::json!(duration_ms);
@@ -161,7 +164,8 @@ pub async fn get_characters() -> impl IntoResponse {
             match slug {
                 "viper" => {
                     // Score multiplier applied to all events during the Rampage window.
-                    obj["payload"] = serde_json::json!({ "multiplier": cfg.viper_rampage_multiplier });
+                    obj["payload"] =
+                        serde_json::json!({ "multiplier": cfg.viper_rampage_multiplier });
                 }
                 "oracle" => {
                     // Fraction of normal speed (0 < slow_factor < 1) during Time Slow.
@@ -174,7 +178,10 @@ pub async fn get_characters() -> impl IntoResponse {
         })
         .collect();
 
-    (StatusCode::OK, axum::Json(serde_json::Value::Array(characters)))
+    (
+        StatusCode::OK,
+        axum::Json(serde_json::Value::Array(characters)),
+    )
 }
 
 #[cfg(test)]

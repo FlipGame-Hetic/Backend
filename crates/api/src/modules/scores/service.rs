@@ -2,7 +2,7 @@ use sqlx::{Row, SqlitePool};
 
 use super::dto::{SaveScoreRequest, ScoreEntry};
 
-// Hard cap on leaderboard size — enforced at write time, never exceeded in the DB
+// Hard cap on leaderboard size enforced at write time, never exceeded in the DB
 const LEADERBOARD_LIMIT: i64 = 10;
 
 /// Attempts to insert `req` into the top-10 leaderboard.
