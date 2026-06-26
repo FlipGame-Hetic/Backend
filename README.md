@@ -42,7 +42,7 @@ docker compose up -d mosquitto        # Broker only (for MQTT Explorer)
 ```bash
 rustup default stable       # Rust 1.89+
 cargo build                 # Build workspace
-cargo test                  # 158 tests (api + game-logic + screen-hub + mqtt-bridge + shared)
+cargo test                  # 173 tests (api + game-logic + screen-hub + mqtt-bridge + shared)
 ```
 Documentation of the codebase:
 ```bash
@@ -120,7 +120,7 @@ HTML report + Tab of the coverage
 ```
 cargo llvm-cov --html
 ```
-(Last tested 18/06/2026: ~68.55% code coverage)
+(Last tested 26/06/2026: ~69.19% code coverage)
 
 
 ## Tech stack
