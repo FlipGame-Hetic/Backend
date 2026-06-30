@@ -54,8 +54,18 @@ impl GameEngine {
                 vec![]
             }
             InboundMessage::Gyro(gyro) if gyro.tilt => self.process(GameEvent::TiltDetected),
-            InboundMessage::Plunger(plunger) if plunger.state == 0 => {
-                self.process(GameEvent::BallLaunched)
+            InboundMessage::Plunger(plunger) => {
+                if self.state.phase != GamePhase::InGame {
+                    return vec![];
+                }
+                let mut envelopes = vec![make_event_envelope(
+                    ScreenEventType::PlungerCharge,
+                    serde_json::json!({ "state": plunger.state }),
+                )];
+                if plunger.state == 0 {
+                    envelopes.extend(self.process(GameEvent::BallLaunched));
+                }
+                envelopes
             }
             _ => vec![],
         }
@@ -300,20 +310,36 @@ mod tests {
     }
 
     // handle_inbound: plunger (direct InboundMessage::Plunger)
+    // Mirrors ButtonId::UnderPlunger: emits PlungerCharge on both press and release,
+    // and fires BallLaunched only on release — but only while InGame.
 
     #[test]
-    fn plunger_inbound_release_processes_ball_launched() {
+    fn plunger_inbound_release_emits_plunger_charge() {
         let mut engine = started();
         let msg = InboundMessage::Plunger(PlungerInput { state: 0, ts: 0 });
-        // BallLaunched is a no-op in process but must not panic
         let evs = engine.handle_inbound(&msg);
-        assert!(evs.is_empty());
+        assert!(
+            evs.iter()
+                .any(|e| e.event_type == ScreenEventType::PlungerCharge)
+        );
     }
 
     #[test]
-    fn plunger_inbound_held_returns_empty() {
+    fn plunger_inbound_held_emits_plunger_charge() {
         let mut engine = started();
         let msg = InboundMessage::Plunger(PlungerInput { state: 1, ts: 0 });
+        let evs = engine.handle_inbound(&msg);
+        assert!(
+            evs.iter()
+                .any(|e| e.event_type == ScreenEventType::PlungerCharge)
+        );
+    }
+
+    #[test]
+    fn plunger_inbound_outside_in_game_returns_empty() {
+        let mut engine = GameEngine::new("enforcer");
+        // Phase is Idle — plunger must be silenced outside InGame
+        let msg = InboundMessage::Plunger(PlungerInput { state: 0, ts: 0 });
         let evs = engine.handle_inbound(&msg);
         assert!(evs.is_empty());
     }

@@ -93,13 +93,13 @@
     "ball/hit": {
       "single_collision": {
         "hits": [
-          { "id": "bumper_1", "type": "bumper", "force": 0.95 }
+          { "id": "bumper_1", "type": "bumper", "force": 0.95, "position": { "x": 1.5, "z": 2.3 } }
         ]
       },
       "multiple_collisions": {
         "hits": [
-          { "id": "bumper_1", "type": "bumper", "force": 0.95 },
-          { "id": "rail_left", "type": "rail", "force": 0.30 }
+          { "id": "bumper_1", "type": "bumper", "force": 0.95, "position": { "x": 1.5, "z": 2.3 } },
+          { "id": "rail_left", "type": "rail", "force": 0.30, "position": { "x": -2.1, "z": 1.8 } }
         ]
       },
       "no_collision": {

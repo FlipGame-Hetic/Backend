@@ -125,6 +125,8 @@ pub enum ScreenEventType {
     MultiballTriggered,
     RailStart,
     RailEnd,
+    /// Full hit list from the 3D frontend, forwarded to the ESP32 as `ball/hit`.
+    BallHit,
     // Outbound: emitted by the game engine to screens
     BossDefeated,
     BossCleared,
@@ -182,6 +184,7 @@ impl ScreenEventType {
             Self::MultiballTriggered => "MultiballTriggered",
             Self::RailStart => "RailStart",
             Self::RailEnd => "RailEnd",
+            Self::BallHit => "BallHit",
             Self::BossDefeated => "BossDefeated",
             Self::BossCleared => "BossCleared",
             Self::GameOver => "GameOver",
@@ -245,6 +248,7 @@ impl From<String> for ScreenEventType {
             "MultiballTriggered" => Self::MultiballTriggered,
             "RailStart" => Self::RailStart,
             "RailEnd" => Self::RailEnd,
+            "BallHit" => Self::BallHit,
             "BossDefeated" => Self::BossDefeated,
             "BossCleared" => Self::BossCleared,
             "GameOver" => Self::GameOver,
