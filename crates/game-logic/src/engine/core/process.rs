@@ -27,6 +27,7 @@ impl GameEngine {
                 self.state.phase = GamePhase::InGame;
                 self.state.session_start = Some(now);
                 self.timer_bonus_given = false;
+                self.ball_in_play = false;
                 self.combo_detector = ComboDetector::new();
                 self.multiplier = MultiplierState::new();
                 self.streak.reset();
@@ -79,6 +80,11 @@ impl GameEngine {
 
             GameEvent::ButtonPressed { side } => {
                 if self.state.phase != GamePhase::InGame {
+                    return envelopes;
+                }
+                // Combo sequence only advances when the ball is physically on the playfield.
+                // Flipper actions still pass through; only the combo counter is gated.
+                if !self.ball_in_play {
                     return envelopes;
                 }
                 let press = side.into();

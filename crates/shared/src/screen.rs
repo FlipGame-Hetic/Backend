@@ -127,6 +127,8 @@ pub enum ScreenEventType {
     RailEnd,
     /// Full hit list from the 3D frontend, forwarded to the ESP32 as `ball/hit`.
     BallHit,
+    /// Binary edge: `in_play: true` when ball leaves plunger, `false` on last drain.
+    BallInPlay,
     // Outbound: emitted by the game engine to screens
     BossDefeated,
     BossCleared,
@@ -185,6 +187,7 @@ impl ScreenEventType {
             Self::RailStart => "RailStart",
             Self::RailEnd => "RailEnd",
             Self::BallHit => "BallHit",
+            Self::BallInPlay => "BallInPlay",
             Self::BossDefeated => "BossDefeated",
             Self::BossCleared => "BossCleared",
             Self::GameOver => "GameOver",
@@ -249,6 +252,7 @@ impl From<String> for ScreenEventType {
             "RailStart" => Self::RailStart,
             "RailEnd" => Self::RailEnd,
             "BallHit" => Self::BallHit,
+            "BallInPlay" => Self::BallInPlay,
             "BossDefeated" => Self::BossDefeated,
             "BossCleared" => Self::BossCleared,
             "GameOver" => Self::GameOver,
