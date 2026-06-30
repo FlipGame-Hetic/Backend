@@ -4,6 +4,7 @@ use axum::response::IntoResponse;
 use futures_util::{SinkExt, StreamExt};
 use lucyd::lucy_ws;
 use serde::Deserialize;
+use shared::events::{BallHit, OutboundMessage, WsMessage};
 use shared::screen::{ScreenEnvelope, ScreenEventType, ScreenId};
 use tracing::{debug, error, info, warn};
 
@@ -179,6 +180,22 @@ async fn process_screen_event(state: &AppState, envelope: &ScreenEnvelope) {
         ScreenEventType::RailEnd => {
             let ball_id = extract_ball_id(&envelope.payload);
             GameService::new(state).end_rail(ball_id).await;
+        }
+        ScreenEventType::BallHit => {
+            let device_id = state.active_device_id.read().await.clone();
+            if let Some(id) = device_id {
+                match serde_json::from_value::<BallHit>(envelope.payload.clone()) {
+                    Ok(ball_hit) => {
+                        state.hub.send(WsMessage::Outbound {
+                            device_id: id,
+                            payload: OutboundMessage::BallHit(ball_hit),
+                        });
+                    }
+                    Err(e) => {
+                        warn!(error = %e, "invalid BallHit payload from screen");
+                    }
+                }
+            }
         }
         _ => {
             if let Err(e) = GameService::new(state).process_screen_event(envelope).await {

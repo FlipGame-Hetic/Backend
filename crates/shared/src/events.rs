@@ -106,6 +106,13 @@ pub struct BumperHit {
 
 // ── Server → ESP32 ────────────────────────────────────────────────────────────
 
+/// 2-D position in the pinball playfield coordinate system (X horizontal, Z depth).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct Position {
+    pub x: f32,
+    pub z: f32,
+}
+
 /// Describes a single collision the server wants the ESP32 to react to.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct Hit {
@@ -116,6 +123,9 @@ pub struct Hit {
     pub hit_type: HitType,
     /// Normalised impact force in the range `[0.0, 1.0]`.
     pub force: f32,
+    /// World position of the object at the time of impact.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub position: Option<Position>,
 }
 
 /// Batch of collision events for one game tick, sent to the ESP32 to trigger
@@ -381,12 +391,32 @@ mod tests {
                     id: "bumper-1".into(),
                     hit_type: HitType::Bumper,
                     force: 0.75,
+                    position: None,
                 }],
             }),
         };
         assert_ws_roundtrip(
             &msg,
             r#"{"dir":"outbound","device_id":"borne-02","payload":{"_type":"BallHit","hits":[{"id":"bumper-1","type":"bumper","force":0.75}]}}"#,
+        );
+    }
+
+    #[test]
+    fn ws_outbound_ball_hit_with_position_roundtrip() {
+        let msg = WsMessage::Outbound {
+            device_id: "borne-02".into(),
+            payload: OutboundMessage::BallHit(BallHit {
+                hits: vec![Hit {
+                    id: "bumper_1".into(),
+                    hit_type: HitType::Bumper,
+                    force: 0.95,
+                    position: Some(Position { x: 1.5, z: 2.3 }),
+                }],
+            }),
+        };
+        assert_ws_roundtrip(
+            &msg,
+            r#"{"dir":"outbound","device_id":"borne-02","payload":{"_type":"BallHit","hits":[{"id":"bumper_1","type":"bumper","force":0.95,"position":{"x":1.5,"z":2.3}}]}}"#,
         );
     }
 
