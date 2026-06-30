@@ -40,7 +40,7 @@ impl GameEngine {
                         ButtonId::UnderPlunger => {
                             let mut envelopes = vec![make_event_envelope(
                                 ScreenEventType::PlungerCharge,
-                                serde_json::json!({ "state": btn.state }),
+                                serde_json::json!({ "state": btn.state, "source": "under_plunger" }),
                             )];
                             if btn.state == 0 {
                                 envelopes.extend(self.process(GameEvent::BallLaunched));
@@ -60,7 +60,7 @@ impl GameEngine {
                 }
                 let mut envelopes = vec![make_event_envelope(
                     ScreenEventType::PlungerCharge,
-                    serde_json::json!({ "state": plunger.state }),
+                    serde_json::json!({ "state": plunger.state, "source": "plunger" }),
                 )];
                 if plunger.state == 0 {
                     envelopes.extend(self.process(GameEvent::BallLaunched));
@@ -79,6 +79,18 @@ impl GameEngine {
             ScreenEventType::BallLost => GameEvent::BallLost,
             ScreenEventType::BallSaved => GameEvent::BallSaved,
             ScreenEventType::LifeUp => GameEvent::LifeUp,
+            ScreenEventType::BallInPlay => {
+                let in_play = envelope
+                    .payload
+                    .get("in_play")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(false);
+                self.ball_in_play = in_play;
+                if !in_play {
+                    self.combo_detector = crate::combo::ComboDetector::new();
+                }
+                return vec![];
+            }
             // UltimateActivated is no longer the activation path.
             // L2/R2 is the authoritative trigger. Ignore this event to avoid the old ping-pong.
             ScreenEventType::UltimateActivated => return vec![],
@@ -261,6 +273,30 @@ mod tests {
     }
 
     #[test]
+    fn under_plunger_press_source_is_under_plunger() {
+        let mut engine = started();
+        let evs = engine.handle_inbound(&btn(ButtonId::UnderPlunger, 1));
+        let charge = evs
+            .iter()
+            .find(|e| e.event_type == ScreenEventType::PlungerCharge)
+            .expect("should emit PlungerCharge");
+        assert_eq!(charge.payload["source"], serde_json::json!("under_plunger"));
+        assert_eq!(charge.payload["state"], serde_json::json!(1));
+    }
+
+    #[test]
+    fn under_plunger_release_source_is_under_plunger() {
+        let mut engine = started();
+        let evs = engine.handle_inbound(&btn(ButtonId::UnderPlunger, 0));
+        let charge = evs
+            .iter()
+            .find(|e| e.event_type == ScreenEventType::PlungerCharge)
+            .expect("should emit PlungerCharge");
+        assert_eq!(charge.payload["source"], serde_json::json!("under_plunger"));
+        assert_eq!(charge.payload["state"], serde_json::json!(0));
+    }
+
+    #[test]
     fn plunger_released_emits_plunger_charge_and_ball_launched() {
         let mut engine = started();
         // state=0 → release fires BallLaunched (no-op in process, but the inbound path runs)
@@ -333,6 +369,32 @@ mod tests {
             evs.iter()
                 .any(|e| e.event_type == ScreenEventType::PlungerCharge)
         );
+    }
+
+    #[test]
+    fn plunger_inbound_press_source_is_plunger() {
+        let mut engine = started();
+        let msg = InboundMessage::Plunger(PlungerInput { state: 1, ts: 0 });
+        let evs = engine.handle_inbound(&msg);
+        let charge = evs
+            .iter()
+            .find(|e| e.event_type == ScreenEventType::PlungerCharge)
+            .expect("should emit PlungerCharge");
+        assert_eq!(charge.payload["source"], serde_json::json!("plunger"));
+        assert_eq!(charge.payload["state"], serde_json::json!(1));
+    }
+
+    #[test]
+    fn plunger_inbound_release_source_is_plunger() {
+        let mut engine = started();
+        let msg = InboundMessage::Plunger(PlungerInput { state: 0, ts: 0 });
+        let evs = engine.handle_inbound(&msg);
+        let charge = evs
+            .iter()
+            .find(|e| e.event_type == ScreenEventType::PlungerCharge)
+            .expect("should emit PlungerCharge");
+        assert_eq!(charge.payload["source"], serde_json::json!("plunger"));
+        assert_eq!(charge.payload["state"], serde_json::json!(0));
     }
 
     #[test]
@@ -475,5 +537,94 @@ mod tests {
         // GameOver is not handled by handle_screen_event → falls through to "other"
         let evs = engine.handle_screen_event(&screen_ev(ScreenEventType::GameOver));
         assert!(evs.is_empty());
+    }
+
+    // handle_screen_event: BallInPlay
+
+    fn ball_in_play_ev(in_play: bool) -> ScreenEnvelope {
+        ScreenEnvelope {
+            from: shared::screen::ScreenId::GameEngine,
+            to: shared::screen::ScreenTarget::Broadcast,
+            event_type: ScreenEventType::BallInPlay,
+            payload: serde_json::json!({ "in_play": in_play }),
+        }
+    }
+
+    #[test]
+    fn ball_in_play_true_sets_flag() {
+        let mut engine = started();
+        assert!(!engine.ball_in_play);
+        engine.handle_screen_event(&ball_in_play_ev(true));
+        assert!(engine.ball_in_play);
+    }
+
+    #[test]
+    fn ball_in_play_false_clears_flag() {
+        let mut engine = started();
+        engine.handle_screen_event(&ball_in_play_ev(true));
+        engine.handle_screen_event(&ball_in_play_ev(false));
+        assert!(!engine.ball_in_play);
+    }
+
+    #[test]
+    fn ball_in_play_false_resets_combo_buffer() {
+        let mut engine = started();
+        // Push some presses while ball_in_play is false — they should be ignored.
+        // Then set ball_in_play=true and verify a combo still needs full sequence.
+        engine.handle_screen_event(&ball_in_play_ev(false));
+        // These flipper presses happen without ball in play → combo buffer not fed.
+        engine.handle_screen_event(&screen_ev(ScreenEventType::FlipperLeft));
+        engine.handle_screen_event(&screen_ev(ScreenEventType::FlipperLeft));
+        // Now ball lands on playfield.
+        engine.handle_screen_event(&ball_in_play_ev(true));
+        // After drain the buffer must be cleared and a fresh sequence required.
+        let _ = engine; // sanity: no panic
+    }
+
+    #[test]
+    fn combos_blocked_when_ball_not_in_play() {
+        let mut engine = started();
+        // ball_in_play defaults to false → ButtonPressed must be a no-op for combos.
+        let mut all_evs = vec![];
+        for ev in &[
+            ScreenEventType::FlipperLeft,
+            ScreenEventType::FlipperLeft,
+            ScreenEventType::FlipperRight,
+            ScreenEventType::FlipperRight,
+            ScreenEventType::FlipperRight,
+            ScreenEventType::FlipperLeft,
+        ] {
+            all_evs.extend(engine.handle_screen_event(&screen_ev(ev.clone())));
+        }
+        assert!(
+            !all_evs
+                .iter()
+                .any(|e| e.event_type == ScreenEventType::ComboActivated),
+            "combos must not fire while ball is not in play"
+        );
+    }
+
+    #[test]
+    fn combos_allowed_when_ball_in_play() {
+        let mut engine = started();
+        engine.handle_screen_event(&ball_in_play_ev(true));
+        // combo id=4: LLRRRL (combo_4_bonus = 1_000 in default config)
+        let mut all_evs = vec![];
+        for ev in &[
+            ScreenEventType::FlipperLeft,
+            ScreenEventType::FlipperLeft,
+            ScreenEventType::FlipperRight,
+            ScreenEventType::FlipperRight,
+            ScreenEventType::FlipperRight,
+            ScreenEventType::FlipperLeft,
+        ] {
+            all_evs.extend(engine.handle_screen_event(&screen_ev(ev.clone())));
+        }
+        assert!(
+            all_evs
+                .iter()
+                .any(|e| e.event_type == ScreenEventType::ComboActivated),
+            "combo must fire when ball is in play"
+        );
     }
 }

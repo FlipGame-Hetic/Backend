@@ -40,6 +40,9 @@ pub struct GameEngine {
     character: Box<dyn Character>,
     /// Prevents the timer bonus from being awarded more than once per game.
     timer_bonus_given: bool,
+    /// True only when the frontend has confirmed a ball is physically on the playfield.
+    /// Combos are gated on this flag to prevent free score while the ball is in the plunger.
+    pub ball_in_play: bool,
 }
 
 impl GameEngine {
@@ -52,6 +55,7 @@ impl GameEngine {
             pve_engine: PveEngine::new(),
             character: select_character(character_slug),
             timer_bonus_given: false,
+            ball_in_play: false,
         }
     }
 
