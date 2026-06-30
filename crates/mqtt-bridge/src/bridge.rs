@@ -308,3 +308,176 @@ async fn publish_outbound(
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use futures_util::sink::unfold;
+    use shared::events::{GameState, OutboundMessage, WsMessage};
+    use shared::model::GamePhase;
+    use tokio::sync::{Mutex, mpsc};
+    use tokio_tungstenite::tungstenite::Message as WsRawMessage;
+
+    use super::{ws_outbound_loop, ws_write_loop};
+
+    // ws_write_loop
+
+    /// Messages sent to the channel must arrive at the sink serialised as JSON
+    /// text frames.
+    #[tokio::test]
+    async fn ws_write_loop_serializes_message_to_sink() {
+        let (tx, rx) = mpsc::channel::<WsMessage>(8);
+
+        let captured: Arc<Mutex<Vec<WsRawMessage>>> = Arc::new(Mutex::new(vec![]));
+        let cap2 = Arc::clone(&captured);
+
+        let mock_sink = Box::pin(unfold((), move |(), msg: WsRawMessage| {
+            let c = Arc::clone(&cap2);
+            async move {
+                c.lock().await.push(msg);
+                Ok::<_, tokio_tungstenite::tungstenite::Error>(())
+            }
+        }));
+
+        let msg = WsMessage::Outbound {
+            device_id: "esp01".into(),
+            payload: OutboundMessage::GameState(GameState {
+                state: GamePhase::Playing,
+                ball_number: 1,
+                score: 42_000,
+                player: 1,
+                total_players: 1,
+            }),
+        };
+
+        tx.send(msg).await.unwrap();
+        drop(tx);
+
+        ws_write_loop(rx, mock_sink).await.unwrap();
+
+        let frames = captured.lock().await;
+        assert_eq!(frames.len(), 1, "exactly one frame should have been sent");
+
+        match &frames[0] {
+            WsRawMessage::Text(t) => {
+                let parsed: WsMessage = serde_json::from_str(t).expect("frame must be valid JSON");
+                match parsed {
+                    WsMessage::Outbound {
+                        device_id,
+                        payload: OutboundMessage::GameState(gs),
+                    } => {
+                        assert_eq!(device_id, "esp01");
+                        assert_eq!(gs.score, 42_000);
+                        assert_eq!(gs.state, GamePhase::Playing);
+                    }
+                    other => panic!("unexpected payload variant: {other:?}"),
+                }
+            }
+            other => panic!("expected Text frame, got {other:?}"),
+        }
+    }
+
+    /// Dropping all senders must cause the loop to exit cleanly (`Ok(())`).
+    #[tokio::test]
+    async fn ws_write_loop_exits_cleanly_when_channel_closes() {
+        let (tx, rx) = mpsc::channel::<WsMessage>(1);
+
+        let mock_sink = Box::pin(unfold((), |(), _msg: WsRawMessage| async {
+            Ok::<_, tokio_tungstenite::tungstenite::Error>(())
+        }));
+
+        drop(tx);
+        let result = ws_write_loop(rx, mock_sink).await;
+        assert!(result.is_ok(), "loop should exit Ok when channel closes");
+    }
+
+    /// Multiple messages must all be forwarded in order.
+    #[tokio::test]
+    async fn ws_write_loop_forwards_multiple_messages_in_order() {
+        let (tx, rx) = mpsc::channel::<WsMessage>(8);
+
+        let captured: Arc<Mutex<Vec<String>>> = Arc::new(Mutex::new(vec![]));
+        let cap2 = Arc::clone(&captured);
+
+        let mock_sink = Box::pin(unfold((), move |(), msg: WsRawMessage| {
+            let c = Arc::clone(&cap2);
+            async move {
+                if let WsRawMessage::Text(t) = msg {
+                    c.lock().await.push(t.as_str().to_owned());
+                }
+                Ok::<_, tokio_tungstenite::tungstenite::Error>(())
+            }
+        }));
+
+        for score in [1000u64, 2000, 3000] {
+            tx.send(WsMessage::Outbound {
+                device_id: "esp01".into(),
+                payload: OutboundMessage::GameState(GameState {
+                    state: GamePhase::Playing,
+                    ball_number: 1,
+                    score,
+                    player: 1,
+                    total_players: 1,
+                }),
+            })
+            .await
+            .unwrap();
+        }
+        drop(tx);
+
+        ws_write_loop(rx, mock_sink).await.unwrap();
+
+        let frames = captured.lock().await;
+        assert_eq!(frames.len(), 3);
+        for (i, expected_score) in [1000u64, 2000, 3000].iter().enumerate() {
+            let parsed: serde_json::Value = serde_json::from_str(&frames[i]).unwrap();
+            assert_eq!(
+                parsed["payload"]["score"],
+                serde_json::json!(expected_score),
+                "frame {i} should carry score {expected_score}"
+            );
+        }
+    }
+
+    // ws_outbound_loop
+
+    /// A WebSocket `Close` frame must cause `ws_outbound_loop` to return `Ok(())`.
+    /// No MQTT publish is attempted for a close frame.
+    #[tokio::test]
+    async fn ws_outbound_loop_exits_cleanly_on_close_frame() {
+        let frames = vec![Ok::<_, tokio_tungstenite::tungstenite::Error>(
+            WsRawMessage::Close(None),
+        )];
+        let mock_stream = futures_util::stream::iter(frames);
+
+        let opts = rumqttc::MqttOptions::new("test-close", "127.0.0.1", 11883);
+        let (client, _evl) = rumqttc::AsyncClient::new(opts, 4);
+
+        let result = ws_outbound_loop(mock_stream, client).await;
+        assert!(result.is_ok(), "close frame should produce Ok(())");
+    }
+
+    /// Malformed JSON text frames must be skipped and the loop must continue
+    /// until a close frame terminates it cleanly.
+    #[tokio::test]
+    async fn ws_outbound_loop_skips_invalid_json_then_exits_on_close() {
+        let frames = vec![
+            Ok::<_, tokio_tungstenite::tungstenite::Error>(WsRawMessage::Text(
+                "{ not: valid json }".into(),
+            )),
+            Ok(WsRawMessage::Text("".into())),
+            Ok(WsRawMessage::Close(None)),
+        ];
+        let mock_stream = futures_util::stream::iter(frames);
+
+        let opts = rumqttc::MqttOptions::new("test-invalid", "127.0.0.1", 11883);
+        let (client, _evl) = rumqttc::AsyncClient::new(opts, 4);
+
+        let result = ws_outbound_loop(mock_stream, client).await;
+        assert!(
+            result.is_ok(),
+            "invalid JSON frames must be skipped, not cause an error"
+        );
+    }
+}

@@ -120,7 +120,7 @@ HTML report + Tab of the coverage
 ```
 cargo llvm-cov --html
 ```
-(Last tested 26/06/2026: ~69.19% code coverage)
+(Last tested 30/06/2026: ~82.24% code coverage)
 
 
 ## Tech stack
